@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-5">
+        <div class="card">
+            <div class="card-header">
+                <h4>添加新负责人</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('admin.manage_personnel') }}">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.name.label(class="form-label") }}
+                        {% if form.name.errors %}
+                            {{ form.name(class="form-control is-invalid") }}
+                            <div class="invalid-feedback">
+                                {% for error in form.name.errors %}
+                                    <span>{{ error }}</span>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            {{ form.name(class="form-control") }}
+                        {% endif %}
+                    </div>
+                    {{ form.submit(class="btn btn-primary") }}
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-7">
+        <h4>现有负责人列表</h4>
+        {% if personnel_list %}
+            <ul class="list-group">
+                {% for person in personnel_list %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                        {{ person.name }}
+                        <form action="{{ url_for('admin.delete_personnel', person_id=person.id) }}" method="POST" onsubmit="return confirm('您确定要删除这位负责人吗？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-sm btn-outline-danger">删除</button>
+                        </form>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <p class="text-muted">尚未添加任何负责人。</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
