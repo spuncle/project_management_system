@@ -6,6 +6,7 @@ from flask import (render_template, request, jsonify, redirect,
 from flask_login import login_required, current_user
 from datetime import date, timedelta, datetime
 from sqlalchemy import and_, func, case
+import openpyxl
 
 from . import main_bp
 from app import db
@@ -14,7 +15,6 @@ from app.utils import log_activity
 from app.decorators import permission_required, admin_required
 
 def get_week_dates(start_date_str=None):
-    """获取指定日期所在周的周一到周日日期列表。"""
     if start_date_str:
         try:
             base_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
@@ -34,7 +34,6 @@ def index():
     start_of_week = week_dates[0]
     end_of_week = week_dates[-1]
 
-    # 判断当前是否为当前周，用于UI显示
     today = date.today()
     current_week_start = today - timedelta(days=today.weekday())
     is_current_week = (start_of_week == current_week_start)
@@ -53,7 +52,7 @@ def index():
     prev_week_start = start_of_week - timedelta(days=7)
     next_week_start = start_of_week + timedelta(days=7)
 
-    page_title=f"周工作计划 ({start_of_week.strftime('%Y-%m-%d')} - {end_of_week.strftime('%Y-%m-%d')})"
+    page_title=f"周工作计划 ({start_of_week.strftime('%Y-%m-%d')} 至 {end_of_week.strftime('%Y-%m-%d')})" # <--- 修改了日期分隔符
 
     return render_template(
         'main/index.html', 
@@ -64,6 +63,7 @@ def index():
         next_week=next_week_start.strftime('%Y-%m-%d'),
         is_current_week=is_current_week,
         page_title=page_title
+        # `current_user` is automatically available in templates, no need to pass it
     )
 
 @main_bp.route('/add_task', methods=['POST'])
@@ -126,6 +126,23 @@ def update_task(task_id):
     if not data:
         return jsonify({'success': False, 'error': '无效数据'}), 400
 
+    # --- 乐观锁检查 ---
+    client_version = data.get('version')
+    # 检查客户端是否提交了版本号，并且是否与数据库中的版本号不匹配
+    if client_version is not None and task.version != client_version:
+        # 发生冲突，返回 409 状态码，并附上数据库的当前数据
+        return jsonify({
+            'success': False, 
+            'error': '此任务已被他人修改，请解决冲突。',
+            'conflict': True,
+            'current_data': {
+                'content': task.content,
+                'personnel': task.personnel,
+                'version': task.version
+            }
+        }), 409
+    # --------------------
+
     task.content = data.get('content', task.content)
     task.personnel = data.get('personnel', task.personnel)
     
@@ -136,6 +153,7 @@ def update_task(task_id):
         except ValueError:
             return jsonify({'success': False, 'error': '无效的日期格式'}), 400
 
+    task.version += 1 # 每次更新时，版本号加一
     db.session.commit()
     log_activity('更新任务', f"更新了任务ID {task_id}，内容: '{task.content}'")
     return jsonify({'success': True, 'message': '任务已更新。'})

@@ -39,15 +39,20 @@
 document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.copy-btn').forEach(button => {
         button.addEventListener('click', function() {
-            const code = this.dataset.code;
-            navigator.clipboard.writeText(code).then(() => {
+            const codeToCopy = this.dataset.code;
+            navigator.clipboard.writeText(codeToCopy).then(() => {
                 const originalText = this.textContent;
                 this.textContent = '已复制!';
+                this.classList.add('btn-success');
+                this.classList.remove('btn-outline-secondary');
                 setTimeout(() => {
                     this.textContent = originalText;
+                    this.classList.remove('btn-success');
+                    this.classList.add('btn-outline-secondary');
                 }, 1500);
             }).catch(err => {
                 console.error('无法复制邀请码: ', err);
+                alert('复制失败，请手动复制。');
             });
         });
     });

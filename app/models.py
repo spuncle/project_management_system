@@ -9,15 +9,12 @@ def load_user(user_id):
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     
-    # --- 权限字段默认值修改 ---
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
-    can_add = db.Column(db.Boolean, nullable=False, default=False) # <--- 修改
-    can_edit = db.Column(db.Boolean, nullable=False, default=False) # <--- 修改
-    can_delete = db.Column(db.Boolean, nullable=False, default=False) # <--- 修改
-    # --------------------------
+    can_add = db.Column(db.Boolean, nullable=False, default=False)
+    can_edit = db.Column(db.Boolean, nullable=False, default=False)
+    can_delete = db.Column(db.Boolean, nullable=False, default=False)
     
     schedules = db.relationship('WorkSchedule', backref='author', lazy=True)
     logs = db.relationship('ActivityLog', backref='user', lazy=True)
@@ -39,6 +36,7 @@ class WorkSchedule(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     position = db.Column(db.Integer, nullable=False, default=0)
+    version = db.Column(db.Integer, nullable=False, default=0) # <--- 【新增】版本号字段
 
 class ActivityLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)

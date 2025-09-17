@@ -16,10 +16,9 @@ def register():
     form = RegistrationForm()
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        user = User(username=form.username.data, email=form.email.data, password_hash=hashed_password)
+        user = User(username=form.username.data, password_hash=hashed_password)
         db.session.add(user)
         
-        # 将邀请码标记为已用
         invitation = InvitationCode.query.filter_by(code=form.invitation_code.data).first()
         invitation.is_used = True
         
@@ -33,7 +32,6 @@ def register():
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
-    # ... 内容无变化 ...
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
     form = LoginForm()
@@ -51,12 +49,10 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
-    # ... 内容无变化 ...
     log_activity('用户登出')
     logout_user()
     return redirect(url_for('auth.login'))
 
-# --- 邀请逻辑重写，并设为管理员权限 ---
 @auth_bp.route('/invite', methods=['GET', 'POST'])
 @login_required
 @admin_required

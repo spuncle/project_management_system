@@ -1,6 +1,6 @@
 import os
 from app import create_app, db
-from app.models import User, InvitationCode 
+from app.models import User, InvitationCode
 
 app = create_app()
 

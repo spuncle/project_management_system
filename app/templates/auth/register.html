@@ -14,11 +14,6 @@
                             <div class="invalid-feedback">{% for error in form.username.errors %}<span>{{ error }}</span>{% endfor %}</div>
                         </div>
                         <div class="mb-3">
-                            {{ form.email.label(class="form-label") }}
-                             {% if form.email.errors %}{{ form.email(class="form-control is-invalid") }}{% else %}{{ form.email(class="form-control") }}{% endif %}
-                            <div class="invalid-feedback">{% for error in form.email.errors %}<span>{{ error }}</span>{% endfor %}</div>
-                        </div>
-                        <div class="mb-3">
                             {{ form.password.label(class="form-label") }}
                             {% if form.password.errors %}{{ form.password(class="form-control is-invalid") }}{% else %}{{ form.password(class="form-control") }}{% endif %}
                             <div class="invalid-feedback">{% for error in form.password.errors %}<span>{{ error }}</span>{% endfor %}</div>
