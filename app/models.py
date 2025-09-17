@@ -12,28 +12,25 @@ class User(db.Model, UserMixin):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     
-    # --- 新增权限字段 ---
+    # --- 权限字段默认值修改 ---
     is_admin = db.Column(db.Boolean, nullable=False, default=False)
-    can_add = db.Column(db.Boolean, nullable=False, default=True)
-    can_edit = db.Column(db.Boolean, nullable=False, default=True)
-    can_delete = db.Column(db.Boolean, nullable=False, default=True)
-    # --------------------
+    can_add = db.Column(db.Boolean, nullable=False, default=False) # <--- 修改
+    can_edit = db.Column(db.Boolean, nullable=False, default=False) # <--- 修改
+    can_delete = db.Column(db.Boolean, nullable=False, default=False) # <--- 修改
+    # --------------------------
     
     schedules = db.relationship('WorkSchedule', backref='author', lazy=True)
     logs = db.relationship('ActivityLog', backref='user', lazy=True)
     sent_invitations = db.relationship('InvitationCode', backref='creator', lazy=True)
 
-# --- 模型重命名并简化 ---
 class InvitationCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     code = db.Column(db.String(50), unique=True, nullable=False)
     is_used = db.Column(db.Boolean, default=False, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     created_by_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-# --------------------
 
 class WorkSchedule(db.Model):
-    # ... 内容无变化 ...
     id = db.Column(db.Integer, primary_key=True)
     task_date = db.Column(db.Date, nullable=False)
     content = db.Column(db.Text, nullable=False)
@@ -44,7 +41,6 @@ class WorkSchedule(db.Model):
     position = db.Column(db.Integer, nullable=False, default=0)
 
 class ActivityLog(db.Model):
-    # ... 内容无变化 ...
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     action = db.Column(db.String(100), nullable=False)
@@ -52,6 +48,8 @@ class ActivityLog(db.Model):
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Personnel(db.Model):
-    # ... 内容无变化 ...
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
+
+    def __repr__(self):
+        return f'<Personnel {self.name}>'

@@ -45,11 +45,15 @@
                             <div class="task-content">{{ task.content }}</div>
                             <div class="task-footer">
                                 <small class="text-muted"><i class="bi bi-person"></i> {{ task.personnel }}</small>
+                                
+                                {# --- 权限判断：只有管理员或有编辑/删除权限的用户才能看到操作按钮 --- #}
                                 {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
                                 <div class="task-controls">
+                                    {# --- 编辑按钮权限 --- #}
                                     {% if current_user.is_admin or current_user.can_edit %}
                                     <button class="btn btn-sm btn-light py-0 px-1 edit-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-task-id="{{ task.id }}"><i class="bi bi-pencil-fill"></i></button>
                                     {% endif %}
+                                    {# --- 删除按钮权限 --- #}
                                     {% if current_user.is_admin or current_user.can_delete %}
                                     <form action="{{ url_for('main.delete_task', task_id=task.id) }}" method="POST" class="d-inline" onsubmit="return confirm('确定要删除此任务吗？');">
                                         <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
@@ -62,6 +66,8 @@
                         </div>
                         {% endfor %}
                     </div>
+                    
+                    {# --- 添加按钮权限 --- #}
                     {% if current_user.is_admin or current_user.can_add %}
                     <div class="text-center mt-2">
                         <button class="btn btn-sm btn-light w-100 add-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-date="{{ day.strftime('%Y-%m-%d') }}">

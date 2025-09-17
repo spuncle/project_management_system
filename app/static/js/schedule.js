@@ -1,6 +1,9 @@
 document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    const taskModal = new bootstrap.Modal(document.getElementById('taskModal'));
+    const taskModalElement = document.getElementById('taskModal');
+    if (!taskModalElement) return;
+
+    const taskModal = new bootstrap.Modal(taskModalElement);
     const taskForm = document.getElementById('taskForm');
     const taskModalLabel = document.getElementById('taskModalLabel');
 
@@ -50,31 +53,29 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // --- 统一处理模态框的打开事件 ---
     document.body.addEventListener('click', async function(event) {
-        // 点击“添加”按钮
-        if (event.target.closest('.add-task-btn')) {
-            const button = event.target.closest('.add-task-btn');
+        const addBtn = event.target.closest('.add-task-btn');
+        const editBtn = event.target.closest('.edit-task-btn');
+
+        if (addBtn) {
             taskModalLabel.textContent = '添加新任务';
             formAction.value = 'add';
             taskForm.reset();
             formTaskId.value = '';
             
-            const date = button.dataset.date;
+            const date = addBtn.dataset.date;
             formStartDate.value = date;
-            formEndDate.value = date; // 默认为当天
+            formEndDate.value = date;
             formEndDate.min = date;
             
-            // 显示结束日期输入框
-            formEndDate.parentElement.style.display = 'block';
+            formEndDate.parentElement.parentElement.style.display = 'flex';
         }
 
-        // 点击“编辑”按钮
-        if (event.target.closest('.edit-task-btn')) {
-            const button = event.target.closest('.edit-task-btn');
+        if (editBtn) {
             taskModalLabel.textContent = '编辑任务';
             formAction.value = 'edit';
             taskForm.reset();
             
-            const taskId = button.dataset.taskId;
+            const taskId = editBtn.dataset.taskId;
             const response = await fetch(`/api/get_task/${taskId}`);
             if (response.ok) {
                 const task = await response.json();
@@ -83,8 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 formPersonnel.value = task.personnel;
                 formStartDate.value = task.task_date;
                 
-                // 编辑时隐藏结束日期，因为只修改单条记录
-                formEndDate.parentElement.style.display = 'none';
+                formEndDate.parentElement.parentElement.style.display = 'none';
             } else {
                 alert('无法加载任务详情。');
                 taskModal.hide();
@@ -96,42 +96,44 @@ document.addEventListener('DOMContentLoaded', function () {
     taskForm.addEventListener('submit', async function(event) {
         event.preventDefault();
         const action = formAction.value;
+        let response;
         
-        if (action === 'add') {
-            // 添加新任务，使用传统的表单提交
-            const formData = new FormData(taskForm);
-            formData.append('csrf_token', csrfToken);
-
-            fetch("{{ url_for('main.add_task') }}", {
-                method: 'POST',
-                body: formData
-            }).then(response => {
-                if(response.ok) location.reload();
-                else alert('添加失败。');
-            });
-
-        } else if (action === 'edit') {
-            // 编辑任务，使用API
-            const taskId = formTaskId.value;
-            const data = {
-                content: formContent.value,
-                personnel: formPersonnel.value,
-                task_date: formStartDate.value
-            };
-
-            const response = await fetch(`/api/update_task/${taskId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify(data)
-            });
+        try {
+            if (action === 'add') {
+                const formData = new FormData(taskForm);
+                
+                // 【关键修正】这里使用标准的相对路径 /add_task
+                response = await fetch("/add_task", {
+                    method: 'POST',
+                    body: formData,
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+            } else if (action === 'edit') {
+                const taskId = formTaskId.value;
+                const data = {
+                    content: formContent.value,
+                    personnel: formPersonnel.value,
+                    task_date: formStartDate.value
+                };
+                response = await fetch(`/api/update_task/${taskId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                    body: JSON.stringify(data)
+                });
+            }
 
             if (response.ok) {
-                location.reload(); 
+                location.reload();
             } else {
-                alert('更新失败。');
+                const errorData = await response.json();
+                alert(errorData.error || `操作失败 (状态码: ${response.status})`);
             }
+        } catch (error) {
+            console.error('An error occurred:', error);
+            alert('发生网络错误或无法解析服务器响应。');
+        } finally {
+            taskModal.hide();
         }
-        taskModal.hide();
     });
 
     // 联动开始和结束日期
