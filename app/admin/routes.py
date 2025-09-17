@@ -1,32 +1,248 @@
-from flask import render_template, redirect, url_for, flash, request
-from flask_login import login_required
-from . import admin_bp
-from .forms import PersonnelForm
-from app import db
-from app.models import Personnel
-from app.utils import log_activity
+import pandas as pd
+from io import BytesIO
+from openpyxl.utils import get_column_letter
+from flask import (render_template, request, jsonify, redirect, 
+                   url_for, flash, Response, make_response)
+from flask_login import login_required, current_user
+from datetime import date, timedelta, datetime
+from sqlalchemy import and_, func, case
 
-@admin_bp.route('/personnel', methods=['GET', 'POST'])
+from . import main_bp
+from app import db
+from app.models import WorkSchedule, ActivityLog, Personnel
+from app.utils import log_activity
+from app.decorators import permission_required, admin_required
+
+def get_week_dates(start_date_str=None):
+    """获取指定日期所在周的周一到周日日期列表。"""
+    if start_date_str:
+        try:
+            base_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            base_date = date.today()
+    else:
+        base_date = date.today()
+    
+    start_of_week = base_date - timedelta(days=base_date.weekday())
+    return [start_of_week + timedelta(days=i) for i in range(7)]
+
+@main_bp.route('/')
 @login_required
-def manage_personnel():
-    form = PersonnelForm()
-    if form.validate_on_submit():
-        person = Personnel(name=form.name.data)
-        db.session.add(person)
-        db.session.commit()
-        log_activity('添加负责人', f"添加了新负责人: {person.name}")
-        flash(f'负责人 "{person.name}" 已成功添加。', 'success')
-        return redirect(url_for('admin.manage_personnel'))
+def index():
+    start_date_str = request.args.get('start_date')
+    week_dates = get_week_dates(start_date_str)
+    start_of_week = week_dates[0]
+    end_of_week = week_dates[-1]
+
+    # 判断当前是否为当前周，用于UI显示
+    today = date.today()
+    current_week_start = today - timedelta(days=today.weekday())
+    is_current_week = (start_of_week == current_week_start)
+
+    tasks = WorkSchedule.query.filter(
+        WorkSchedule.task_date.between(start_of_week, end_of_week)
+    ).order_by(WorkSchedule.task_date, WorkSchedule.position).all()
     
     personnel_list = Personnel.query.order_by(Personnel.name).all()
-    return render_template('admin/personnel.html', title="负责人管理", form=form, personnel_list=personnel_list)
+    
+    schedule_by_day = {day: [] for day in week_dates}
+    for task in tasks:
+        if task.task_date in schedule_by_day:
+            schedule_by_day[task.task_date].append(task)
+        
+    prev_week_start = start_of_week - timedelta(days=7)
+    next_week_start = start_of_week + timedelta(days=7)
 
-@admin_bp.route('/personnel/delete/<int:person_id>', methods=['POST'])
+    page_title=f"周工作计划 ({start_of_week.strftime('%Y-%m-%d')} - {end_of_week.strftime('%Y-%m-%d')})"
+
+    return render_template(
+        'main/index.html', 
+        schedule_by_day=schedule_by_day,
+        week_dates=week_dates,
+        personnel_list=personnel_list,
+        prev_week=prev_week_start.strftime('%Y-%m-%d'),
+        next_week=next_week_start.strftime('%Y-%m-%d'),
+        is_current_week=is_current_week,
+        page_title=page_title
+    )
+
+@main_bp.route('/add_task', methods=['POST'])
 @login_required
-def delete_personnel(person_id):
-    person = Personnel.query.get_or_404(person_id)
-    log_activity('删除负责人', f"删除了负责人: {person.name}")
-    db.session.delete(person)
+@permission_required('can_add')
+def add_task():
+    start_date_str = request.form.get('start_date')
+    end_date_str = request.form.get('end_date') or start_date_str
+    content = request.form.get('content')
+    personnel = request.form.get('personnel')
+
+    if not all([start_date_str, content, personnel]):
+        flash('开始日期、工作内容和人员均为必填项。', 'danger')
+        return redirect(url_for('main.index'))
+
+    try:
+        start_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
+        end_date = datetime.strptime(end_date_str, '%Y-%m-%d').date()
+    except ValueError:
+        flash('日期格式不正确。', 'danger')
+        return redirect(url_for('main.index', start_date=start_date_str))
+
+    current_date = start_date
+    while current_date <= end_date:
+        max_pos = db.session.query(func.max(WorkSchedule.position)).filter_by(task_date=current_date).scalar() or -1
+        new_task = WorkSchedule(
+            task_date=current_date,
+            content=content,
+            personnel=personnel,
+            author_id=current_user.id,
+            position=max_pos + 1
+        )
+        db.session.add(new_task)
+        current_date += timedelta(days=1)
+    
     db.session.commit()
-    flash(f'负责人 "{person.name}" 已被删除。', 'success')
-    return redirect(url_for('admin.manage_personnel'))
+    log_activity('创建任务', f"为日期 {start_date_str} 到 {end_date_str} 添加了任务: '{content}'")
+    flash('新任务已添加。', 'success')
+        
+    return redirect(url_for('main.index', start_date=start_date_str))
+
+@main_bp.route('/api/get_task/<int:task_id>')
+@login_required
+def get_task_details(task_id):
+    task = WorkSchedule.query.get_or_404(task_id)
+    return jsonify({
+        'id': task.id,
+        'task_date': task.task_date.strftime('%Y-%m-%d'),
+        'content': task.content,
+        'personnel': task.personnel
+    })
+
+@main_bp.route('/api/update_task/<int:task_id>', methods=['POST'])
+@login_required
+@permission_required('can_edit')
+def update_task(task_id):
+    task = WorkSchedule.query.get_or_404(task_id)
+    data = request.get_json()
+
+    if not data:
+        return jsonify({'success': False, 'error': '无效数据'}), 400
+
+    task.content = data.get('content', task.content)
+    task.personnel = data.get('personnel', task.personnel)
+    
+    new_date_str = data.get('task_date')
+    if new_date_str:
+        try:
+            task.task_date = datetime.strptime(new_date_str, '%Y-%m-%d').date()
+        except ValueError:
+            return jsonify({'success': False, 'error': '无效的日期格式'}), 400
+
+    db.session.commit()
+    log_activity('更新任务', f"更新了任务ID {task_id}，内容: '{task.content}'")
+    return jsonify({'success': True, 'message': '任务已更新。'})
+
+@main_bp.route('/api/update_order', methods=['POST'])
+@login_required
+@permission_required('can_edit')
+def update_order():
+    data = request.get_json()
+    task_ids = data.get('task_ids', [])
+    
+    if task_ids:
+        # 查询任务变更前的状态以用于日志记录
+        tasks_before_dict = {t.id: {'pos': t.position, 'content': t.content[:20]} for t in WorkSchedule.query.filter(WorkSchedule.id.in_(task_ids)).all()}
+        
+        # 使用 case 语句进行批量更新，效率更高
+        case_statement = case(
+            {int(task_id): index for index, task_id in enumerate(task_ids)},
+            value=WorkSchedule.id
+        )
+        db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(task_ids)).update(
+            {'position': case_statement}, synchronize_session=False
+        )
+        db.session.commit()
+        
+        # 生成详细日志
+        details = []
+        for index, task_id_str in enumerate(task_ids):
+            task_id = int(task_id_str)
+            if task_id in tasks_before_dict and tasks_before_dict[task_id]['pos'] != index:
+                details.append(f"任务'{tasks_before_dict[task_id]['content']}...' 从位置 {tasks_before_dict[task_id]['pos']} 移至 {index}")
+        
+        if details:
+            log_activity('调整任务顺序', "; ".join(details))
+    
+    return jsonify({'success': True})
+
+@main_bp.route('/delete_task/<int:task_id>', methods=['POST'])
+@login_required
+@permission_required('can_delete')
+def delete_task(task_id):
+    task = WorkSchedule.query.get_or_404(task_id)
+    start_date = task.task_date - timedelta(days=task.task_date.weekday())
+    log_activity('删除任务', f"删除任务ID {task_id}, 内容: '{task.content}'")
+    db.session.delete(task)
+    db.session.commit()
+    flash('任务已删除。', 'success')
+    return redirect(url_for('main.index', start_date=start_date.strftime('%Y-%m-%d')))
+
+@main_bp.route('/export_excel', methods=['POST'])
+@login_required
+def export_excel():
+    start_date_str = request.form.get('start_date')
+    week_dates = get_week_dates(start_date_str)
+    start_of_week = week_dates[0]
+    end_of_week = week_dates[-1]
+
+    tasks = WorkSchedule.query.filter(
+        WorkSchedule.task_date.between(start_of_week, end_of_week)
+    ).order_by(WorkSchedule.task_date, WorkSchedule.position).all()
+    
+    if not tasks:
+        flash('该周没有可导出的数据。', 'warning')
+        return redirect(url_for('main.index', start_date=start_date_str))
+
+    # 按页面格式重塑数据
+    schedule_by_day = {day: [] for day in week_dates}
+    for task in tasks:
+        if task.task_date in schedule_by_day:
+            # 格式化每条任务的显示内容
+            schedule_by_day[task.task_date].append(f"{task.content} ({task.personnel})")
+
+    max_rows = 0
+    if schedule_by_day:
+        max_rows = max(len(tasks) for tasks in schedule_by_day.values()) if any(schedule_by_day.values()) else 0
+
+    data_dict = {}
+    for day in week_dates:
+        day_str = day.strftime('%Y-%m-%d') + " (星期" + ['一','二','三','四','五','六','日'][day.weekday()] + ")"
+        tasks_for_day = schedule_by_day[day]
+        # 使用空字符串补全列表，使其长度一致
+        data_dict[day_str] = tasks_for_day + [''] * (max_rows - len(tasks_for_day))
+
+    df = pd.DataFrame(data_dict)
+
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='周工作计划')
+        worksheet = writer.sheets['周工作计划']
+        # 自动调整列宽和文本换行
+        for i, col in enumerate(df.columns, 1):
+            column_letter = get_column_letter(i)
+            worksheet.column_dimensions[column_letter].width = 40 # 设置一个较大的默认宽度
+            for cell in worksheet[column_letter]:
+                cell.alignment = openpyxl.styles.Alignment(wrap_text=True, vertical='top')
+    
+    output.seek(0)
+    log_activity('导出Excel', f"导出了 {start_of_week} 到 {end_of_week} 的工作计划。")
+    response = make_response(output.read())
+    response.headers["Content-Disposition"] = f"attachment; filename=work_schedule_{start_of_week}.xlsx"
+    response.headers["Content-type"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return response
+
+@main_bp.route('/logs')
+@login_required
+@admin_required
+def activity_logs():
+    page = request.args.get('page', 1, type=int)
+    logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).paginate(page=page, per_page=20)
+    return render_template('main/logs.html', logs=logs, title="操作日志")

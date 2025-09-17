@@ -6,6 +6,7 @@ body {
     vertical-align: middle;
 }
 
+/* 任务卡片样式 */
 .task-card {
     border: 1px solid #dee2e6;
     border-radius: .3rem;
@@ -42,7 +43,7 @@ body {
     opacity: 1;
 }
 
-/* 拖拽时的占位符样式 */
+/* 拖拽占位符样式 */
 .blue-background-class {
     background-color: #e0e7ff;
     border: 1px dashed #6366f1;

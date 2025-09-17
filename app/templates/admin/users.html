@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h3 class="mb-4">{{ title }}</h3>
+<div class="table-responsive">
+    <table class="table table-hover">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>用户名</th>
+                <th>管理员</th>
+                <th>允许添加</th>
+                <th>允许编辑</th>
+                <th>允许删除</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for user in users %}
+            <tr>
+                <td>{{ user.id }}</td>
+                <td>{{ user.username }}</td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input permission-toggle" type="checkbox" role="switch" 
+                               data-user-id="{{ user.id }}" data-permission="is_admin" 
+                               {% if user.is_admin %}checked{% endif %} {% if user.id == current_user.id %}disabled{% endif %}>
+                    </div>
+                </td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input permission-toggle" type="checkbox" role="switch" 
+                               data-user-id="{{ user.id }}" data-permission="can_add" 
+                               {% if user.can_add %}checked{% endif %} {% if user.is_admin %}disabled{% endif %}>
+                    </div>
+                </td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input permission-toggle" type="checkbox" role="switch" 
+                               data-user-id="{{ user.id }}" data-permission="can_edit" 
+                               {% if user.can_edit %}checked{% endif %} {% if user.is_admin %}disabled{% endif %}>
+                    </div>
+                </td>
+                <td>
+                    <div class="form-check form-switch">
+                        <input class="form-check-input permission-toggle" type="checkbox" role="switch" 
+                               data-user-id="{{ user.id }}" data-permission="can_delete" 
+                               {% if user.can_delete %}checked{% endif %} {% if user.is_admin %}disabled{% endif %}>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <small class="text-muted">提示：管理员默认拥有所有权限。不能修改自己的权限。</small>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+    
+    document.querySelectorAll('.permission-toggle').forEach(toggle => {
+        toggle.addEventListener('change', async function() {
+            const userId = this.dataset.userId;
+            const permission = this.dataset.permission;
+            const value = this.checked;
+
+            try {
+                const response = await fetch(`/admin/api/user/${userId}/permissions`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': csrfToken
+                    },
+                    body: JSON.stringify({
+                        permission: permission,
+                        value: value
+                    })
+                });
+
+                if (!response.ok) {
+                    // 如果请求失败，则将复选框恢复原状
+                    this.checked = !value;
+                    alert('更新权限失败。');
+                } else {
+                    // 成功后刷新页面以正确显示禁用的状态
+                    location.reload();
+                }
+
+            } catch (error) {
+                this.checked = !value;
+                alert('发生网络错误。');
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

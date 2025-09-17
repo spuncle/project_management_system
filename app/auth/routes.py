@@ -2,48 +2,38 @@ import secrets
 from flask import render_template, url_for, flash, redirect, request
 from . import auth_bp
 from .forms import RegistrationForm, LoginForm, InvitationForm
-from app.models import User, Invitation
+from app.models import User, InvitationCode
 from app import db, bcrypt
 from flask_login import login_user, current_user, logout_user, login_required
 from app.utils import log_activity
+from app.decorators import admin_required
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
-
-    invite_code = request.args.get('invite')
-    if not invite_code:
-        flash('注册需要一个有效的邀请码。', 'danger')
-        return redirect(url_for('auth.login'))
-
-    invitation = Invitation.query.filter_by(code=invite_code, is_used=False).first()
-    if not invitation:
-        flash('邀请码无效或已被使用。', 'danger')
-        return redirect(url_for('auth.login'))
-
+    
     form = RegistrationForm()
-    # 预填充邀请的邮箱地址
-    if request.method == 'GET':
-        form.email.data = invitation.email
-
     if form.validate_on_submit():
         hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
         user = User(username=form.username.data, email=form.email.data, password_hash=hashed_password)
         db.session.add(user)
-
+        
+        # 将邀请码标记为已用
+        invitation = InvitationCode.query.filter_by(code=form.invitation_code.data).first()
         invitation.is_used = True
+        
         db.session.commit()
-
+        
         flash('您的账户已创建！现在可以登录了。', 'success')
-        log_activity('用户注册', f"用户 {user.username} 使用邀请码 {invite_code} 注册成功。")
+        log_activity('用户注册', f"用户 {user.username} 使用邀请码 {invitation.code} 注册成功。")
         return redirect(url_for('auth.login'))
-
+        
     return render_template('auth/register.html', title='注册', form=form)
-
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
 def login():
+    # ... 内容无变化 ...
     if current_user.is_authenticated:
         return redirect(url_for('main.index'))
     form = LoginForm()
@@ -61,26 +51,26 @@ def login():
 
 @auth_bp.route('/logout')
 def logout():
+    # ... 内容无变化 ...
     log_activity('用户登出')
     logout_user()
     return redirect(url_for('auth.login'))
 
+# --- 邀请逻辑重写，并设为管理员权限 ---
 @auth_bp.route('/invite', methods=['GET', 'POST'])
 @login_required
+@admin_required
 def invite():
     form = InvitationForm()
     if form.validate_on_submit():
-        email = form.email.data
-        code = secrets.token_urlsafe(16)
-        invitation = Invitation(code=code, email=email, created_by_id=current_user.id)
-        db.session.add(invitation)
+        code_str = secrets.token_urlsafe(16)
+        new_code = InvitationCode(code=code_str, created_by_id=current_user.id)
+        db.session.add(new_code)
         db.session.commit()
-
-        invite_link = url_for('auth.register', invite=code, _external=True)
-        flash(f'已为 {email} 生成邀请链接:', 'success')
-        flash(invite_link, 'info')
-        log_activity('生成邀请码', f"为邮箱 {email} 生成邀请码。")
+        
+        flash(f'已生成新邀请码: {code_str}', 'success')
+        log_activity('生成邀请码', f"生成了邀请码 {code_str}")
         return redirect(url_for('auth.invite'))
-
-    invitations = Invitation.query.filter_by(created_by_id=current_user.id).order_by(Invitation.created_at.desc()).all()
-    return render_template('auth/invite.html', title='邀请新用户', form=form, invitations=invitations)
+    
+    codes = InvitationCode.query.filter_by(is_used=False).order_by(InvitationCode.created_at.desc()).all()
+    return render_template('auth/invite.html', title='生成邀请码', form=form, codes=codes)

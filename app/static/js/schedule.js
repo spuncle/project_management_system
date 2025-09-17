@@ -1,28 +1,28 @@
 document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
-    const editTaskModal = new bootstrap.Modal(document.getElementById('editTaskModal'));
-    const editTaskForm = document.getElementById('editTaskForm');
-    const editTaskIdField = document.getElementById('editTaskId');
-    const editTaskDateField = document.getElementById('editTaskDate');
-    const editTaskContentField = document.getElementById('editTaskContent');
-    const editTaskPersonnelField = document.getElementById('editTaskPersonnel');
+    const taskModal = new bootstrap.Modal(document.getElementById('taskModal'));
+    const taskForm = document.getElementById('taskForm');
+    const taskModalLabel = document.getElementById('taskModalLabel');
 
-    // --- 功能: 初始化拖拽排序 ---
+    const formTaskId = document.getElementById('taskFormTaskId');
+    const formAction = document.getElementById('taskFormAction');
+    const formContent = document.getElementById('taskFormContent');
+    const formPersonnel = document.getElementById('taskFormPersonnel');
+    const formStartDate = document.getElementById('taskFormStartDate');
+    const formEndDate = document.getElementById('taskFormEndDate');
+
+    // --- 初始化拖拽排序 ---
     document.querySelectorAll('.task-list-container').forEach(container => {
         new Sortable(container, {
             animation: 150,
-            group: 'shared', // 允许在不同日期之间拖拽
+            group: 'shared',
             ghostClass: 'blue-background-class',
             onEnd: function (evt) {
                 const taskId = evt.item.dataset.taskId;
-
-                // 如果任务被拖拽到了新的日期列
                 if (evt.from !== evt.to) {
                     const newDate = evt.to.dataset.date;
                     updateTaskDate(taskId, newDate);
                 }
-                
-                // 更新源列表和目标列表的顺序
                 updateOrder(evt.from);
                 if (evt.from !== evt.to) {
                     updateOrder(evt.to);
@@ -33,7 +33,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     async function updateOrder(container) {
         const taskIds = Array.from(container.children).map(card => card.dataset.taskId);
-        await fetch('/api/update_order', {
+        fetch('/api/update_order', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
             body: JSON.stringify({ task_ids: taskIds })
@@ -41,77 +41,104 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function updateTaskDate(taskId, newDate) {
-        await fetch(`/api/update_task/${taskId}`, {
+        fetch(`/api/update_task/${taskId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
             body: JSON.stringify({ task_date: newDate })
         });
     }
 
-    // --- 功能: 处理任务编辑模态框 ---
+    // --- 统一处理模态框的打开事件 ---
     document.body.addEventListener('click', async function(event) {
+        // 点击“添加”按钮
+        if (event.target.closest('.add-task-btn')) {
+            const button = event.target.closest('.add-task-btn');
+            taskModalLabel.textContent = '添加新任务';
+            formAction.value = 'add';
+            taskForm.reset();
+            formTaskId.value = '';
+            
+            const date = button.dataset.date;
+            formStartDate.value = date;
+            formEndDate.value = date; // 默认为当天
+            formEndDate.min = date;
+            
+            // 显示结束日期输入框
+            formEndDate.parentElement.style.display = 'block';
+        }
+
+        // 点击“编辑”按钮
         if (event.target.closest('.edit-task-btn')) {
             const button = event.target.closest('.edit-task-btn');
-            const taskId = button.dataset.taskId;
+            taskModalLabel.textContent = '编辑任务';
+            formAction.value = 'edit';
+            taskForm.reset();
             
-            // 获取任务详情并填充表单
+            const taskId = button.dataset.taskId;
             const response = await fetch(`/api/get_task/${taskId}`);
             if (response.ok) {
                 const task = await response.json();
-                editTaskIdField.value = task.id;
-                editTaskDateField.value = task.task_date;
-                editTaskContentField.value = task.content;
-                editTaskPersonnelField.value = task.personnel;
+                formTaskId.value = task.id;
+                formContent.value = task.content;
+                formPersonnel.value = task.personnel;
+                formStartDate.value = task.task_date;
+                
+                // 编辑时隐藏结束日期，因为只修改单条记录
+                formEndDate.parentElement.style.display = 'none';
             } else {
                 alert('无法加载任务详情。');
+                taskModal.hide();
             }
         }
     });
 
-    // 提交编辑表单
-    editTaskForm.addEventListener('submit', async function(event) {
+    // --- 统一处理模态框的表单提交事件 ---
+    taskForm.addEventListener('submit', async function(event) {
         event.preventDefault();
-        const taskId = editTaskIdField.value;
-        const data = {
-            task_date: editTaskDateField.value,
-            content: editTaskContentField.value,
-            personnel: editTaskPersonnelField.value
-        };
+        const action = formAction.value;
+        
+        if (action === 'add') {
+            // 添加新任务，使用传统的表单提交
+            const formData = new FormData(taskForm);
+            formData.append('csrf_token', csrfToken);
 
-        const response = await fetch(`/api/update_task/${taskId}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-            body: JSON.stringify(data)
-        });
+            fetch("{{ url_for('main.add_task') }}", {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if(response.ok) location.reload();
+                else alert('添加失败。');
+            });
 
-        if (response.ok) {
-            editTaskModal.hide();
-            location.reload(); 
-        } else {
-            alert('更新失败。');
+        } else if (action === 'edit') {
+            // 编辑任务，使用API
+            const taskId = formTaskId.value;
+            const data = {
+                content: formContent.value,
+                personnel: formPersonnel.value,
+                task_date: formStartDate.value
+            };
+
+            const response = await fetch(`/api/update_task/${taskId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                location.reload(); 
+            } else {
+                alert('更新失败。');
+            }
         }
+        taskModal.hide();
     });
 
-    // --- 功能: 添加多日任务的日期逻辑 ---
-    const addTaskStartDate = document.getElementById('addTaskStartDate');
-    const addTaskEndDate = document.getElementById('addTaskEndDate');
-    if(addTaskStartDate && addTaskEndDate) {
-        addTaskStartDate.addEventListener('change', function() {
-            if (!addTaskEndDate.value || addTaskEndDate.value < this.value) {
-                addTaskEndDate.value = this.value;
-            }
-            addTaskEndDate.min = this.value;
-        });
-    }
-
-    // --- 功能: 处理“添加当日任务”的简化模态框 ---
-    const addSingleDayTaskDateField = document.getElementById('addSingleDayTaskDate');
-    document.body.addEventListener('click', function(event) {
-        if (event.target.closest('.add-single-day-btn')) {
-            const button = event.target.closest('.add-single-day-btn');
-            const date = button.dataset.date;
-            // 将按钮所在日期的值，预先填充到模态框的隐藏日期字段中
-            addSingleDayTaskDateField.value = date;
+    // 联动开始和结束日期
+    formStartDate.addEventListener('change', function() {
+        if (!formEndDate.value || formEndDate.value < this.value) {
+            formEndDate.value = this.value;
         }
+        formEndDate.min = this.value;
     });
 });

@@ -1,42 +1,56 @@
 {% extends "base.html" %}
+
 {% block content %}
 <div class="row">
     <div class="col-md-6">
         <div class="card">
             <div class="card-header">
-                <h4>邀请新用户</h4>
+                <h4>生成新邀请码</h4>
             </div>
             <div class="card-body">
+                <p>点击下方按钮来生成一个新的、未使用的邀请码。</p>
                 <form method="POST">
                     {{ form.hidden_tag() }}
-                    <div class="mb-3">
-                        {{ form.email.label(class="form-label") }}
-                        {{ form.email(class="form-control", placeholder="example@email.com") }}
-                    </div>
                     {{ form.submit(class="btn btn-primary") }}
                 </form>
             </div>
         </div>
     </div>
     <div class="col-md-6">
-        <h4>已发送的邀请</h4>
-        <ul class="list-group">
-            {% for inv in invitations %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ inv.email }}</strong><br>
-                        <small class="text-muted">Code: {{ inv.code }}</small>
-                    </div>
-                    {% if inv.is_used %}
-                        <span class="badge bg-success">已使用</span>
-                    {% else %}
-                        <span class="badge bg-warning text-dark">未使用</span>
-                    {% endif %}
-                </li>
-            {% else %}
-                <li class="list-group-item">您还没有发送任何邀请。</li>
+        <h4>未使用的邀请码</h4>
+        {% if codes %}
+        <div class="list-group">
+            {% for code in codes %}
+                <div class="list-group-item d-flex justify-content-between align-items-center">
+                    <code>{{ code.code }}</code>
+                    <button class="btn btn-sm btn-outline-secondary copy-btn" data-code="{{ code.code }}">复制</button>
+                </div>
             {% endfor %}
-        </ul>
+        </div>
+        {% else %}
+        <p class="text-muted">当前没有未使用的邀请码。</p>
+        {% endif %}
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.copy-btn').forEach(button => {
+        button.addEventListener('click', function() {
+            const code = this.dataset.code;
+            navigator.clipboard.writeText(code).then(() => {
+                const originalText = this.textContent;
+                this.textContent = '已复制!';
+                setTimeout(() => {
+                    this.textContent = originalText;
+                }, 1500);
+            }).catch(err => {
+                console.error('无法复制邀请码: ', err);
+            });
+        });
+    });
+});
+</script>
 {% endblock %}
