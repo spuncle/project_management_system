@@ -62,9 +62,9 @@
                         </div>
                         {% endfor %}
                         
-                        {# --- 新增：当某一天没有任务时显示 (空) --- #}
+                        {# --- 修改：为 (空) 占位符应用新样式 --- #}
                         {% if not schedule_by_day[day] %}
-                            <p class="text-center text-muted mt-2">(空)</p>
+                            <p class="empty-day-placeholder">(空)</p>
                         {% endif %}
                     </div>
                     

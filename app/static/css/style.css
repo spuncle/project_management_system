@@ -48,3 +48,11 @@ body {
     background-color: #e0e7ff;
     border: 1px dashed #6366f1;
 }
+
+/* --- 新增的“(空)”占位符样式 --- */
+.empty-day-placeholder {
+    font-size: 0.85rem;
+    color: #adb5bd; /* Bootstrap 风格的浅灰色 */
+    text-align: center;
+    margin-top: 0.5rem;
+}
