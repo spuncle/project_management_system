@@ -13,28 +13,40 @@ login_manager.login_view = 'auth.login'
 login_manager.login_message_category = 'info'
 login_manager.login_message = '请先登录以访问此页面。'
 
-def create_app(template_folder=None, static_folder=None):
+def create_app(): # 注意：我们移除了函数签名中的参数
+    # --- 新增代码：明确定义绝对路径 ---
+    import os
+    # __file__ 指向当前文件 (app/__init__.py)
+    # os.path.dirname() 获取该文件所在的目录 (app/)
+    # os.path.abspath() 获取其绝对路径
+    APP_DIR = os.path.dirname(os.path.abspath(__file__))
+    TEMPLATE_DIR = os.path.join(APP_DIR, 'templates')
+    STATIC_DIR = os.path.join(APP_DIR, 'static')
+
     app = Flask(__name__,
                 instance_relative_config=True,
-                template_folder=template_folder,
-                static_folder=static_folder)
+                template_folder=TEMPLATE_DIR, # <--- 强制使用绝对路径
+                static_folder=STATIC_DIR)     # <--- 静态文件夹也一并强制指定
 
+    # ------------------------------------
+
+    # 后面的配置和初始化代码保持不变
     app.config.from_pyfile('config.py', silent=True)
-    
+
     bootstrap = Bootstrap5(app)
     db.init_app(app)
     bcrypt.init_app(app)
     login_manager.init_app(app)
     CSRFProtect(app)
-    
+
     with app.app_context():
         from .auth import routes as auth_routes
         from .main import routes as main_routes
-        from .admin import routes as admin_routes # <--- 1. 导入 admin 路由
+        from .admin import routes as admin_routes
 
         app.register_blueprint(auth_routes.auth_bp)
         app.register_blueprint(main_routes.main_bp)
-        app.register_blueprint(admin_routes.admin_bp) # <--- 2. 注册 admin 蓝图
+        app.register_blueprint(admin_routes.admin_bp)
 
         db.create_all()
 

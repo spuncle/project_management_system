@@ -7,20 +7,18 @@ document.addEventListener('DOMContentLoaded', function () {
     const editTaskContentField = document.getElementById('editTaskContent');
     const editTaskPersonnelField = document.getElementById('editTaskPersonnel');
 
-    // --- 功能1: 初始化拖拽排序 ---
+    // --- 功能: 初始化拖拽排序 ---
     document.querySelectorAll('.task-list-container').forEach(container => {
         new Sortable(container, {
             animation: 150,
-            group: 'shared', // 可以在不同日期之间拖拽
+            group: 'shared', // 允许在不同日期之间拖拽
             ghostClass: 'blue-background-class',
             onEnd: function (evt) {
-                const targetContainer = evt.to;
-                const taskIds = Array.from(targetContainer.children).map(card => card.dataset.taskId);
-                const newDate = targetContainer.dataset.date;
                 const taskId = evt.item.dataset.taskId;
 
-                // 如果任务被拖拽到了新的日期
+                // 如果任务被拖拽到了新的日期列
                 if (evt.from !== evt.to) {
+                    const newDate = evt.to.dataset.date;
                     updateTaskDate(taskId, newDate);
                 }
                 
@@ -43,8 +41,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     async function updateTaskDate(taskId, newDate) {
-        // 这是一个简化的更新，仅更新日期
-        // 注意：这会触发两次数据库更新（一次日期，一次顺序），可以优化
         await fetch(`/api/update_task/${taskId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
@@ -52,7 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- 功能2: 处理任务编辑模态框 ---
+    // --- 功能: 处理任务编辑模态框 ---
     document.body.addEventListener('click', async function(event) {
         if (event.target.closest('.edit-task-btn')) {
             const button = event.target.closest('.edit-task-btn');
@@ -90,23 +86,32 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (response.ok) {
             editTaskModal.hide();
-            // 简单地刷新页面来显示更新
             location.reload(); 
         } else {
             alert('更新失败。');
         }
     });
 
-    // --- 功能3: 添加多日任务的日期逻辑 (可选) ---
+    // --- 功能: 添加多日任务的日期逻辑 ---
     const addTaskStartDate = document.getElementById('addTaskStartDate');
     const addTaskEndDate = document.getElementById('addTaskEndDate');
     if(addTaskStartDate && addTaskEndDate) {
         addTaskStartDate.addEventListener('change', function() {
-            // 确保结束日期不早于开始日期
             if (!addTaskEndDate.value || addTaskEndDate.value < this.value) {
                 addTaskEndDate.value = this.value;
             }
             addTaskEndDate.min = this.value;
         });
     }
+
+    // --- 功能: 处理“添加当日任务”的简化模态框 ---
+    const addSingleDayTaskDateField = document.getElementById('addSingleDayTaskDate');
+    document.body.addEventListener('click', function(event) {
+        if (event.target.closest('.add-single-day-btn')) {
+            const button = event.target.closest('.add-single-day-btn');
+            const date = button.dataset.date;
+            // 将按钮所在日期的值，预先填充到模态框的隐藏日期字段中
+            addSingleDayTaskDateField.value = date;
+        }
+    });
 });

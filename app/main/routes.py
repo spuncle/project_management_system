@@ -32,6 +32,11 @@ def index():
     start_of_week = week_dates[0]
     end_of_week = week_dates[-1]
 
+    # 判断当前是否为当前周，用于UI显示
+    today = date.today()
+    current_week_start = today - timedelta(days=today.weekday())
+    is_current_week = (start_of_week == current_week_start)
+
     tasks = WorkSchedule.query.filter(
         WorkSchedule.task_date.between(start_of_week, end_of_week)
     ).order_by(WorkSchedule.task_date, WorkSchedule.position).all()
@@ -53,6 +58,7 @@ def index():
         personnel_list=personnel_list,
         prev_week=prev_week_start.strftime('%Y-%m-%d'),
         next_week=next_week_start.strftime('%Y-%m-%d'),
+        is_current_week=is_current_week,
         page_title=f"周工作计划 ({start_of_week.strftime('%Y/%m/%d')} - {end_of_week.strftime('%Y/%m/%d')})"
     )
 
@@ -98,9 +104,6 @@ def add_task():
 @login_required
 def get_task_details(task_id):
     task = WorkSchedule.query.get_or_404(task_id)
-    # 简单的权限检查 (可选)
-    # if task.author_id != current_user.id:
-    #     return jsonify({'error': 'Permission denied'}), 403
     return jsonify({
         'id': task.id,
         'task_date': task.task_date.strftime('%Y-%m-%d'),
@@ -153,7 +156,6 @@ def update_order():
 @main_bp.route('/delete_task/<int:task_id>', methods=['POST'])
 @login_required
 def delete_task(task_id):
-    # ... 内容无变化 ...
     task = WorkSchedule.query.get_or_404(task_id)
     start_date = task.task_date - timedelta(days=task.task_date.weekday())
     log_activity('删除任务', f"删除任务ID {task_id}, 内容: '{task.content}'")
@@ -165,7 +167,6 @@ def delete_task(task_id):
 @main_bp.route('/export_excel', methods=['POST'])
 @login_required
 def export_excel():
-    # ... 内容无变化 ...
     start_date_str = request.form.get('start_date')
     week_dates = get_week_dates(start_date_str)
     start_of_week = week_dates[0]
@@ -206,7 +207,6 @@ def export_excel():
 @main_bp.route('/logs')
 @login_required
 def activity_logs():
-    # ... 内容无变化 ...
     page = request.args.get('page', 1, type=int)
     logs = ActivityLog.query.order_by(ActivityLog.timestamp.desc()).paginate(page=page, per_page=20)
     return render_template('main/logs.html', logs=logs, title="操作日志")
