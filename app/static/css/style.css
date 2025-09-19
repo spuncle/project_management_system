@@ -110,7 +110,6 @@ body {
     margin-top: 0.5rem;
 }
 
-/* --- 【修改】Popover 样式 --- */
 .personnel-display-area {
     cursor: pointer;
     min-height: 38px;
@@ -119,22 +118,28 @@ body {
     gap: 5px;
     align-items: center;
 }
+
 .personnel-selector-popover {
-    /* 移除了固定的 width: 300px */
+    /* 移除固定宽度 */
 }
+
 .personnel-list-wrapper {
     max-height: 200px;
     overflow-y: auto;
 }
+
 .list-group-item label {
     cursor: pointer;
 }
+
 .popover {
-    max-width: 320px; /* 为 popover 本身设置一个最大宽度 */
+    max-width: 320px;
 }
+
 .popover-body {
     padding: 0.5rem;
 }
+
 .list-group-flush .list-group-item {
     padding-left: 0.5rem;
     padding-right: 0.5rem;

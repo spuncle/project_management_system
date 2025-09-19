@@ -1,12 +1,23 @@
+/**
+ * 全局 Toast (浮动提示) 显示函数
+ * @param {string} message - 要显示的消息内容
+ * @param {string} type - 消息类型 ('info', 'success', 'danger', 'warning')
+ */
 function showToast(message, type = 'info') {
     const toastElement = document.getElementById('appToast');
     if (!toastElement) return;
+
     const toastBody = toastElement.querySelector('.toast-body');
     const closeButton = toastElement.querySelector('.btn-close');
     const toast = new bootstrap.Toast(toastElement);
-    toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary');
-    toastElement.classList.add('text-bg-secondary');
-    closeButton.classList.add('btn-close-white');
+
+    // 移除所有可能的颜色类，确保背景干净
+    toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary', 'bg-light', 'text-dark');
+    closeButton.classList.remove('btn-close-white');
+    
+    // 统一使用浅灰色背景和深色文字/按钮
+    toastElement.classList.add('bg-light', 'text-dark');
+
     toastBody.textContent = message;
     toast.show();
 }
@@ -49,10 +60,7 @@ document.addEventListener('DOMContentLoaded', function () {
             
             renderPersonnelList(listContainer, '');
 
-            searchInput.addEventListener('input', () => {
-                console.log("Search input changed:", searchInput.value); // 诊断日志
-                renderPersonnelList(listContainer, searchInput.value)
-            });
+            searchInput.addEventListener('input', () => renderPersonnelList(listContainer, searchInput.value));
             searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -79,10 +87,18 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             return contentEl;
         },
-        title: '选择或添加人员',
         placement: 'bottom',
-        trigger: 'click',
+        trigger: 'focus',
         customClass: 'personnel-popover'
+    });
+
+    personnelDisplayArea.addEventListener('shown.bs.popover', () => {
+        const popoverTip = popover.tip; 
+        if (!popoverTip) return;
+        const searchInput = popoverTip.querySelector('.personnel-search-input');
+        if (searchInput) {
+            searchInput.focus();
+        }
     });
 
     function renderPersonnelList(listContainer, filter = '') {
@@ -95,7 +111,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const li = document.createElement('li');
             li.className = 'list-group-item border-0 p-1 d-flex align-items-center';
             const uniqueId = `personnel-check-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
-            // --- 【修改】移除了 label 上的 w-100 类 ---
             li.innerHTML = `
                 <input class="form-check-input me-2" type="checkbox" value="${name}" id="${uniqueId}" ${isChecked ? 'checked' : ''}>
                 <label class="form-check-label" for="${uniqueId}">${name}</label>
@@ -195,6 +210,7 @@ document.addEventListener('DOMContentLoaded', function () {
             taskModalLabel.textContent = '添加新任务';
             formAction.value = 'add';
             taskForm.reset();
+            formTaskId.value = '';
             currentSelectedPersonnel.clear();
             updatePersonnelDisplay();
             const date = addBtn.dataset.date;
