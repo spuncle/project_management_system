@@ -52,7 +52,8 @@
                                 {% endfor %}
                             </div>
                             <div class="task-footer">
-                                <small class="text-muted">ID: {{task.id}}</small>
+                                {# --- 【修改】移除了 ID 显示 --- #}
+                                <small class="text-muted"></small> 
                                 {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
                                 <div class="task-controls">
                                     {% if current_user.is_admin or current_user.can_edit %}
@@ -88,5 +89,6 @@
 
 <script>
     const USER_CAN_EDIT = {{ 'true' if current_user.is_admin or current_user.can_edit else 'false' }};
+    const PERSONNEL_WHITELIST = {{ personnel_list|map(attribute='name')|list|tojson }};
 </script>
 {% endblock %}

@@ -20,10 +20,11 @@ document.addEventListener('DOMContentLoaded', function () {
     const personnelInput = document.getElementById('taskFormPersonnel');
     const tagify = new Tagify(personnelInput, {
         whitelist: typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [],
+        // --- 【修改】优化下拉列表设置 ---
         dropdown: {
-            maxItems: 20,
-            enabled: 0,
-            closeOnSelect: false
+            maxItems: 20,           // 最多显示20个建议
+            enabled: 0,             // 获得焦点时立即显示建议列表
+            closeOnSelect: false    // 选择后不关闭，方便多选
         }
     });
 
@@ -223,10 +224,10 @@ document.addEventListener('DOMContentLoaded', function () {
         newOverwriteBtn.addEventListener('click', async () => {
             const taskId = formTaskId.value;
             const data = {
-                content: formContent.value, // Resubmit with the original form's content
+                content: formContent.value,
                 personnel: tagify.value,
                 task_date: formStartDate.value,
-                version: currentData.version // Use the NEW version from the server
+                version: currentData.version
             };
 
             const response = await fetch(`/api/update_task/${taskId}`, {
