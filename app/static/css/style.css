@@ -80,10 +80,13 @@ body {
 }
 
 .personnel-tag {
-    display: inline-block;
-    padding: .25em .6em;
-    font-size: 75%;
-    font-weight: 700;
+    /* --- 【修改】改为 flex 布局 --- */
+    display: inline-flex;
+    align-items: center;
+    /* -------------------------- */
+    padding: .25em .4em .25em .6em;
+    font-size: 85%; /* 稍微增大字体 */
+    font-weight: 500;
     line-height: 1;
     text-align: center;
     white-space: nowrap;
@@ -93,10 +96,30 @@ body {
     color: #495057;
     margin-right: 5px;
     margin-bottom: 5px;
-    max-width: 100px;
+    max-width: 150px; /* 适当增加最大宽度 */
     overflow: hidden;
     text-overflow: ellipsis;
 }
+
+/* --- 【新增】标签上的关闭按钮样式 --- */
+.remove-display-tag-btn {
+    background: none;
+    border: none;
+    color: #6c757d;
+    margin-left: 8px;
+    padding: 0;
+    cursor: pointer;
+    font-size: 1.4em;
+    font-weight: 700;
+    line-height: 1;
+    opacity: 0.5;
+}
+.remove-display-tag-btn:hover {
+    opacity: 1;
+    color: #000;
+}
+/* ---------------------------------- */
+
 
 .blue-background-class {
     background-color: #e0e7ff;

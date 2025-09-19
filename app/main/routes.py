@@ -1,6 +1,7 @@
 import pandas as pd
 from io import BytesIO
 from openpyxl.utils import get_column_letter
+from openpyxl.styles import Font, Alignment, Border, Side
 from flask import (render_template, request, jsonify, redirect, 
                    url_for, flash, Response, make_response)
 from flask_login import login_required, current_user
@@ -103,7 +104,6 @@ def add_task():
             author_id=current_user.id,
             position=max_pos + 1
         )
-        # --- 【修改】使用 enumerate 来记录人员顺序 ---
         for index, name in enumerate(personnel_names):
             assignment = TaskAssignment(personnel_name=name, position=index)
             new_task.assignments.append(assignment)
@@ -157,7 +157,6 @@ def update_task(task_id):
     if personnel_data is not None and isinstance(personnel_data, list):
         task.assignments.clear()
         personnel_names = [item['value'] for item in personnel_data if isinstance(item, dict) and item.get('value')]
-        # --- 【修改】使用 enumerate 来记录人员顺序 ---
         for index, name in enumerate(personnel_names):
             task.assignments.append(TaskAssignment(personnel_name=name, position=index))
     
@@ -254,26 +253,26 @@ def export_excel():
         flash('该周没有可导出的数据。', 'warning')
         return redirect(url_for('main.index', start_date=start_date_str))
 
-    # --- 【修改】重写 Excel 导出为长格式 ---
-    excel_data = []
+    # --- 【修改】重写 Excel 导出逻辑 ---
+    schedule_by_day = {day: [] for day in week_dates}
     for task in tasks:
-        if not task.assignments:
-            # 如果某个任务意外地没有分配人员，也添加一条记录
-            excel_data.append({
-                '日期': task.task_date.strftime('%Y-%m-%d'),
-                '工作内容': task.content,
-                '人员': ''
-            })
-        else:
-            # 每个被分配的人员都单独成为一行
-            for assignment in task.assignments:
-                excel_data.append({
-                    '日期': task.task_date.strftime('%Y-%m-%d'),
-                    '工作内容': task.content,
-                    '人员': assignment.personnel_name
-                })
-    
-    df = pd.DataFrame(excel_data)
+        if task.task_date in schedule_by_day:
+            personnel_str = ", ".join([a.personnel_name for a in task.assignments])
+            # 为每个任务添加两行
+            schedule_by_day[task.task_date].append(task.content)
+            schedule_by_day[task.task_date].append(f"({personnel_str})")
+
+    max_rows = 0
+    if schedule_by_day:
+        max_rows = max(len(day_tasks) for day_tasks in schedule_by_day.values()) if any(schedule_by_day.values()) else 0
+
+    data_dict = {}
+    for day in week_dates:
+        day_str = day.strftime('%Y-%m-%d') + " (星期" + ['一','二','三','四','五','六','日'][day.weekday()] + ")"
+        tasks_for_day = schedule_by_day[day]
+        data_dict[day_str] = tasks_for_day + [''] * (max_rows - len(tasks_for_day))
+
+    df = pd.DataFrame(data_dict)
     # ------------------------------------
 
     output = BytesIO()
@@ -281,16 +280,33 @@ def export_excel():
         df.to_excel(writer, index=False, sheet_name='周工作计划')
         worksheet = writer.sheets['周工作计划']
         
-        # 调整列宽
-        worksheet.column_dimensions[get_column_letter(1)].width = 15  # 日期
-        worksheet.column_dimensions[get_column_letter(2)].width = 60  # 工作内容
-        worksheet.column_dimensions[get_column_letter(3)].width = 20  # 人员
+        # 定义样式
+        header_font = Font(bold=True)
+        content_font = Font(bold=True)
+        personnel_font = Font(italic=True, color="808080") # 斜体灰色
+        thin_border = Border(bottom=Side(style='thin'))
+        alignment = Alignment(wrap_text=True, vertical='top')
 
-        # 设置表头样式
-        header_font = openpyxl.styles.Font(bold=True)
-        for cell in worksheet["1:1"]:
-            cell.font = header_font
+        for col_idx, col in enumerate(df.columns, 1):
+            column_letter = get_column_letter(col_idx)
+            worksheet.column_dimensions[column_letter].width = 40
             
+            # 设置表头样式
+            worksheet[f"{column_letter}1"].font = header_font
+            
+            # 遍历单元格设置样式
+            # 从第2行开始，因为第1行是表头
+            for row_idx in range(2, max_rows + 2):
+                cell = worksheet[f"{column_letter}{row_idx}"]
+                cell.alignment = alignment
+                
+                # row_idx-2 是从0开始的数据行索引
+                if (row_idx - 2) % 2 == 0: # 内容行
+                    cell.font = content_font
+                else: # 人员行
+                    cell.font = personnel_font
+                    cell.border = thin_border # 在人员行下方添加分割线
+    
     output.seek(0)
     log_activity('导出Excel', f"导出了 {start_of_week} 到 {end_of_week} 的工作计划。")
     response = make_response(output.read())

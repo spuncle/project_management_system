@@ -54,7 +54,7 @@ document.addEventListener('DOMContentLoaded', function () {
             searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    const newName = searchInput.value.trim();
+                    const newName = e.target.value.trim();
                     if (newName) {
                         currentSelectedPersonnel.add(newName);
                         updatePersonnelDisplay();
@@ -111,7 +111,6 @@ document.addEventListener('DOMContentLoaded', function () {
         listContainer.innerHTML = '';
         const lowerCaseFilter = filter.toLowerCase();
         const filteredList = allPersonnel.filter(p => p.toLowerCase().includes(lowerCaseFilter));
-
         filteredList.forEach(name => {
             const isChecked = currentSelectedPersonnel.has(name);
             const li = document.createElement('li');
@@ -139,7 +138,11 @@ document.addEventListener('DOMContentLoaded', function () {
             names.forEach(name => {
                 const tag = document.createElement('span');
                 tag.className = 'personnel-tag';
-                tag.textContent = name;
+                // --- 【修改】为标签增加关闭按钮 ---
+                tag.innerHTML = `
+                    <span>${name}</span>
+                    <button type="button" class="remove-display-tag-btn" data-name="${name}">&times;</button>
+                `;
                 personnelDisplayArea.appendChild(tag);
             });
         } else {
@@ -149,6 +152,15 @@ document.addEventListener('DOMContentLoaded', function () {
         hiddenPersonnelInput.value = JSON.stringify(personnelForBackend);
     }
     
+    // --- 【新增】为任务表单中的人员标签关闭按钮添加事件委托 ---
+    personnelDisplayArea.addEventListener('click', function(event){
+        if (event.target.classList.contains('remove-display-tag-btn')) {
+            const name = event.target.dataset.name;
+            currentSelectedPersonnel.delete(name); // 从 Set 中删除
+            updatePersonnelDisplay(); // 重新渲染显示区域和隐藏的 input
+        }
+    });
+
     if (typeof USER_CAN_EDIT !== 'undefined' && USER_CAN_EDIT) {
         document.querySelectorAll('.task-list-container').forEach(container => {
             new Sortable(container, {
