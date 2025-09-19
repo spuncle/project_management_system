@@ -8,7 +8,11 @@
 </datalist>
 
 <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-    <h3 class="mb-2 mb-md-0">{{ page_title }}</h3>
+    {# --- 【修改】标题结构 --- #}
+    <h3 class="mb-2 mb-md-0">
+        {{ page_main_title }} 
+        <small class="text-muted fw-normal fs-6">{{ page_date_range }}</small>
+    </h3>
     <div class="d-flex align-items-center flex-wrap">
         <div class="btn-group me-2 mb-2 mb-md-0" role="group">
             <a href="{{ url_for('main.index', start_date=prev_week) }}" class="btn btn-outline-secondary">&laquo; 上一周</a>
@@ -39,7 +43,7 @@
             <tr>
             {% for day in week_dates %}
                 <td class="align-top" style="min-width: 180px; vertical-align: top!important;">
-                    <div class="task-list-container" data-date="{{ day.strftime('%Y-%m-%d') }}">
+                    <div class="task-list-container" data-date="{{ day.strftime('%Y-%m-%d') }}" id="task-list-{{ day.strftime('%Y%m%d') }}">
                         {% for task in schedule_by_day[day] %}
                         <div class="task-card" data-task-id="{{ task.id }}">
                             <div class="task-content">{{ task.content }}</div>
@@ -62,7 +66,6 @@
                         </div>
                         {% endfor %}
                         
-                        {# --- 修改：为 (空) 占位符应用新样式 --- #}
                         {% if not schedule_by_day[day] %}
                             <p class="empty-day-placeholder">(空)</p>
                         {% endif %}
@@ -82,7 +85,6 @@
     </table>
 </div>
 
-{# --- 将用户权限传递给JavaScript --- #}
 <script>
     const USER_CAN_EDIT = {{ 'true' if current_user.is_admin or current_user.can_edit else 'false' }};
 </script>

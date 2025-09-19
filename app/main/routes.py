@@ -51,8 +51,10 @@ def index():
         
     prev_week_start = start_of_week - timedelta(days=7)
     next_week_start = start_of_week + timedelta(days=7)
-
-    page_title=f"周工作计划 ({start_of_week.strftime('%Y-%m-%d')} 至 {end_of_week.strftime('%Y-%m-%d')})" # <--- 修改了日期分隔符
+    
+    # --- 【修改】将标题拆分为两部分 ---
+    page_main_title = "周工作计划"
+    page_date_range = f"({start_of_week.strftime('%Y-%m-%d')} 至 {end_of_week.strftime('%Y-%m-%d')})"
 
     return render_template(
         'main/index.html', 
@@ -62,8 +64,8 @@ def index():
         prev_week=prev_week_start.strftime('%Y-%m-%d'),
         next_week=next_week_start.strftime('%Y-%m-%d'),
         is_current_week=is_current_week,
-        page_title=page_title
-        # `current_user` is automatically available in templates, no need to pass it
+        page_main_title=page_main_title,
+        page_date_range=page_date_range
     )
 
 @main_bp.route('/add_task', methods=['POST'])
@@ -163,31 +165,46 @@ def update_task(task_id):
 @permission_required('can_edit')
 def update_order():
     data = request.get_json()
-    task_ids = data.get('task_ids', [])
+    # 前端现在会传来一个对象列表，每个对象包含 id 和 version
+    tasks_from_client = data.get('tasks', [])
+    task_ids = [t['id'] for t in tasks_from_client]
     
-    if task_ids:
-        # 查询任务变更前的状态以用于日志记录
-        tasks_before_dict = {t.id: {'pos': t.position, 'content': t.content[:20]} for t in WorkSchedule.query.filter(WorkSchedule.id.in_(task_ids)).all()}
-        
-        # 使用 case 语句进行批量更新，效率更高
-        case_statement = case(
-            {int(task_id): index for index, task_id in enumerate(task_ids)},
-            value=WorkSchedule.id
-        )
-        db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(task_ids)).update(
-            {'position': case_statement}, synchronize_session=False
-        )
-        db.session.commit()
-        
-        # 生成详细日志
-        details = []
-        for index, task_id_str in enumerate(task_ids):
-            task_id = int(task_id_str)
-            if task_id in tasks_before_dict and tasks_before_dict[task_id]['pos'] != index:
-                details.append(f"任务'{tasks_before_dict[task_id]['content']}...' 从位置 {tasks_before_dict[task_id]['pos']} 移至 {index}")
-        
-        if details:
-            log_activity('调整任务顺序', "; ".join(details))
+    if not task_ids:
+        return jsonify({'success': True})
+
+    # --- 【修改】乐观锁前置检查 ---
+    # 1. 从数据库中一次性获取所有相关任务的当前版本
+    tasks_from_db = WorkSchedule.query.filter(WorkSchedule.id.in_(task_ids)).all()
+    db_versions = {t.id: t.version for t in tasks_from_db}
+
+    # 2. 检查客户端提交的版本号是否与数据库中的一致
+    for task_client in tasks_from_client:
+        task_id = task_client['id']
+        client_version = task_client['version']
+        if task_id not in db_versions or db_versions[task_id] != client_version:
+            # 只要有一个任务版本不匹配，就拒绝整个操作
+            return jsonify({
+                'success': False,
+                'error': '操作失败，因为任务列表已被他人修改。请刷新页面后重试。',
+                'conflict': True
+            }), 409 # 返回 409 Conflict
+
+    # --------------------------
+
+    # 3. 版本检查通过，执行批量更新
+    case_statement = case(
+        {task['id']: index for index, task in enumerate(tasks_from_client)},
+        value=WorkSchedule.id
+    )
+    # 每次顺序更新，也增加版本号
+    db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(task_ids)).update(
+        {'position': case_statement, 'version': WorkSchedule.version + 1}, 
+        synchronize_session=False
+    )
+    db.session.commit()
+    
+    # 日志记录可以简化，因为细节可能太多
+    log_activity('调整任务顺序', f"更新了 {len(task_ids)} 个任务的顺序")
     
     return jsonify({'success': True})
 
