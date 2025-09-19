@@ -18,13 +18,13 @@ body {
     padding: 0.75rem;
     margin-bottom: 0.5rem;
     background-color: #fff;
+    cursor: grab;
     user-select: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     display: flex;
     flex-direction: column;
 }
 
-/* --- 【修改】只有带交互功能的卡片才有抓取手势 --- */
 .task-card-interactive {
     cursor: grab;
 }
@@ -63,7 +63,6 @@ body {
     justify-self: end;
 }
 
-/* --- 【修改】悬浮效果只对带交互功能的卡片生效 --- */
 .task-card-interactive:hover .personnel-display {
     opacity: 0.2;
     pointer-events: none;
@@ -72,8 +71,6 @@ body {
 .task-card-interactive:hover .task-controls-hover {
     opacity: 1;
 }
-/* ----------------------------------------------- */
-
 
 .personnel-tags {
     display: flex;
@@ -123,3 +120,20 @@ body {
 .tagify.tagify--focus{
     --tags-border-color: #86b7fe;
 }
+
+/* --- 【修改】Tagify 下拉框样式优化 --- */
+.tagify__dropdown__wrapper {
+    /* 让下拉框宽度自适应最长内容的宽度 */
+    width: max-content;
+    /* 同时确保它的宽度至少和输入框一样宽，避免在内容很短时变得太窄 */
+    min-width: 100%;
+    /* 同时设置一个最大宽度，防止某个极长的名字破坏整体布局 */
+    max-width: 450px; 
+}
+
+.tagify__dropdown__item {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+/* ----------------------------------- */
