@@ -59,9 +59,12 @@ body {
     justify-self: end;
 }
 
+/* --- 【关键修正】--- */
 .task-card:hover .personnel-display {
-    opacity: 0.15;
+    opacity: 0.3; /* 1. 按您的要求修改透明度 */
+    pointer-events: none; /* 2. 让这个半透明层可以被“点击穿透” */
 }
+/* ------------------ */
 
 .task-card:hover .task-controls-hover {
     opacity: 1;
@@ -71,7 +74,6 @@ body {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
-    /* 新增，防止标签容器溢出 */
     overflow: hidden;
     max-width: 100%;
 }
@@ -89,13 +91,10 @@ body {
     color: #495057;
     margin-right: 5px;
     margin-bottom: 5px;
-    
-    /* --- 【新增】文本截断样式 --- */
-    max-width: 100px; /* 您可以根据需要调整标签的最大宽度 */
+    max-width: 100px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    /* -------------------------- */
 }
 
 .blue-background-class {
@@ -110,7 +109,6 @@ body {
     margin-top: 0.5rem;
 }
 
-/* Tagify 样式微调 */
 .tagify{
     --tags-border-color: #dee2e6;
 }
