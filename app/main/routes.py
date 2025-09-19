@@ -1,7 +1,7 @@
 import pandas as pd
 from io import BytesIO
 from openpyxl.utils import get_column_letter
-from openpyxl.styles import Font, Alignment, Border, Side
+from openpyxl.styles import Font, Alignment, Border, Side, PatternFill
 from flask import (render_template, request, jsonify, redirect, 
                    url_for, flash, Response, make_response)
 from flask_login import login_required, current_user
@@ -281,24 +281,38 @@ def export_excel():
         header_font = Font(bold=True)
         content_font = Font(bold=True)
         
-        thin_side = Side(style='thin', color="BFBFBF")
+        # 定义黑色细边框
+        thin_side = Side(style='thin', color="000000")
         full_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
         alignment = Alignment(wrap_text=True, vertical='top')
+        
+        # 浅灰色背景填充
+        band_fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
 
         for col_idx, col in enumerate(df.columns, 1):
             column_letter = get_column_letter(col_idx)
             worksheet.column_dimensions[column_letter].width = 40
             
-            worksheet[f"{column_letter}1"].font = header_font
+            # 为表头单元格应用样式
+            header_cell = worksheet[f"{column_letter}1"]
+            header_cell.font = header_font
+            header_cell.border = full_border
             
+            # 遍历所有数据单元格设置样式
             for row_idx in range(2, max_rows + 2):
                 cell = worksheet[f"{column_letter}{row_idx}"]
                 cell.alignment = alignment
-                cell.border = full_border # 应用表格线
+                cell.border = full_border # 为所有数据单元格应用表格线
                 
-                # 仅将内容行加粗
-                if (row_idx - 2) % 2 == 0:
+                task_pair_index = (row_idx - 2) // 2
+                if (row_idx - 2) % 2 == 0: # 内容行
                     cell.font = content_font
+                    if task_pair_index % 2 == 1: # 为第二个、第四个...任务组应用背景色
+                        cell.fill = band_fill
+                else: # 人员行
+                    # 人员行使用默认字体
+                    if task_pair_index % 2 == 1:
+                        cell.fill = band_fill
     
     output.seek(0)
     log_activity('导出Excel', f"导出了 {start_of_week} 到 {end_of_week} 的工作计划。")
