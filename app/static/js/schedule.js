@@ -19,33 +19,107 @@ document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const taskModalElement = document.getElementById('taskModal');
     const conflictModalElement = document.getElementById('conflictResolutionModal');
-    const personnelSelectorModalElement = document.getElementById('personnelSelectorModal');
-    
-    if (!taskModalElement || !conflictModalElement || !personnelSelectorModalElement) {
+    const popoverContentTemplate = document.getElementById('personnel-popover-content-template');
+
+    if (!taskModalElement || !conflictModalElement || !popoverContentTemplate) {
         return;
     }
     const taskModal = new bootstrap.Modal(taskModalElement);
     const conflictModal = new bootstrap.Modal(conflictModalElement);
-    const personnelSelectorModal = new bootstrap.Modal(personnelSelectorModalElement);
-
+    
     const taskForm = document.getElementById('taskForm');
     const taskModalLabel = document.getElementById('taskModalLabel');
     const formTaskId = document.getElementById('taskFormTaskId');
     const formAction = document.getElementById('taskFormAction');
     const formVersion = document.getElementById('taskFormVersion');
     const formContent = document.getElementById('taskFormContent');
-    const formPersonnel = document.getElementById('taskFormPersonnel');
     const formStartDate = document.getElementById('taskFormStartDate');
     const formEndDate = document.getElementById('taskFormEndDate');
 
     const personnelDisplayArea = document.getElementById('personnelDisplayArea');
     const hiddenPersonnelInput = document.getElementById('taskFormPersonnel');
-    const personnelListContainer = document.getElementById('personnel-list-container');
-    const selectedPersonnelContainer = document.getElementById('selected-personnel-container');
-    const personnelSearchInput = document.getElementById('personnelSearchInput');
-
+    
     let currentSelectedPersonnel = new Set();
     const allPersonnel = typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [];
+    
+    const popover = new bootstrap.Popover(personnelDisplayArea, {
+        html: true,
+        content: popoverContentTemplate.innerHTML,
+        title: '选择或添加人员',
+        placement: 'bottom',
+        trigger: 'click',
+        customClass: 'personnel-popover'
+    });
+
+    personnelDisplayArea.addEventListener('shown.bs.popover', () => {
+        const popoverTip = document.getElementById(personnelDisplayArea.getAttribute('aria-describedby'));
+        if (!popoverTip) return;
+
+        const searchInput = popoverTip.querySelector('.personnel-search-input');
+        const listContainer = popoverTip.querySelector('.personnel-list-container');
+        
+        renderPersonnelList(listContainer, searchInput.value);
+
+        searchInput.addEventListener('input', () => renderPersonnelList(listContainer, searchInput.value));
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const newName = searchInput.value.trim();
+                if (newName) {
+                    currentSelectedPersonnel.add(newName);
+                    updatePersonnelDisplay();
+                    renderPersonnelList(listContainer, '');
+                    searchInput.value = '';
+                }
+            }
+        });
+
+        listContainer.addEventListener('change', (e) => {
+            if (e.target.type === 'checkbox') {
+                const name = e.target.value;
+                if (e.target.checked) {
+                    currentSelectedPersonnel.add(name);
+                } else {
+                    currentSelectedPersonnel.delete(name);
+                }
+                updatePersonnelDisplay();
+            }
+        });
+    });
+
+    function renderPersonnelList(listContainer, filter = '') {
+        listContainer.innerHTML = '';
+        const lowerCaseFilter = filter.toLowerCase();
+        const filteredList = allPersonnel.filter(p => p.toLowerCase().includes(lowerCaseFilter));
+
+        filteredList.forEach(name => {
+            const isChecked = currentSelectedPersonnel.has(name);
+            const li = document.createElement('li');
+            li.className = 'list-group-item border-0';
+            li.innerHTML = `
+                <input class="form-check-input me-2" type="checkbox" value="${name}" id="personnel-check-${name.replace(/\s+/g, '-')}" ${isChecked ? 'checked' : ''}>
+                <label class="form-check-label w-100" for="personnel-check-${name.replace(/\s+/g, '-')}">${name}</label>
+            `;
+            listContainer.appendChild(li);
+        });
+    }
+
+    function updatePersonnelDisplay() {
+        const names = Array.from(currentSelectedPersonnel);
+        if (names.length > 0) {
+            personnelDisplayArea.innerHTML = '';
+            names.forEach(name => {
+                const tag = document.createElement('span');
+                tag.className = 'personnel-tag';
+                tag.textContent = name;
+                personnelDisplayArea.appendChild(tag);
+            });
+        } else {
+            personnelDisplayArea.innerHTML = '<span class="text-muted">点击选择人员...</span>';
+        }
+        const personnelForBackend = names.map(name => ({ value: name }));
+        hiddenPersonnelInput.value = JSON.stringify(personnelForBackend);
+    }
     
     if (typeof USER_CAN_EDIT !== 'undefined' && USER_CAN_EDIT) {
         document.querySelectorAll('.task-list-container').forEach(container => {
@@ -82,14 +156,17 @@ document.addEventListener('DOMContentLoaded', function () {
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify(payload)
                         });
+
                         if (!response.ok) {
                             const errorData = await response.json();
                             showToast(errorData.error || "操作失败，页面将刷新以同步最新状态。", 'danger');
+                            setTimeout(() => location.reload(), 2000);
+                        } else {
+                            location.reload();
                         }
                     } catch (error) {
                         showToast("网络错误，操作失败。页面将刷新。", 'danger');
-                    } finally {
-                        setTimeout(() => location.reload(), 1500);
+                        setTimeout(() => location.reload(), 2000);
                     }
                 }
             });
@@ -157,100 +234,6 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteTask(taskId, deleteBtn);
         }
     });
-
-    function renderPersonnelList(filter = '') {
-        personnelListContainer.innerHTML = '';
-        const filteredPersonnel = allPersonnel.filter(p => p.toLowerCase().includes(filter.toLowerCase()));
-        filteredPersonnel.forEach(name => {
-            const isChecked = currentSelectedPersonnel.has(name);
-            const li = document.createElement('li');
-            li.className = 'list-group-item';
-            li.innerHTML = `<input class="form-check-input me-2" type="checkbox" value="${name}" id="personnel-${name.replace(/\s+/g, '-')}" ${isChecked ? 'checked' : ''}><label class="form-check-label w-100" for="personnel-${name.replace(/\s+/g, '-')}">${name}</label>`;
-            personnelListContainer.appendChild(li);
-        });
-    }
-
-    function renderSelectedTags() {
-        selectedPersonnelContainer.innerHTML = '';
-        currentSelectedPersonnel.forEach(name => {
-            const tag = document.createElement('div');
-            tag.className = 'selected-personnel-tag';
-            tag.textContent = name;
-            const removeBtn = document.createElement('button');
-            removeBtn.className = 'remove-tag-btn';
-            removeBtn.innerHTML = '&times;';
-            removeBtn.dataset.name = name;
-            tag.appendChild(removeBtn);
-            selectedPersonnelContainer.appendChild(tag);
-        });
-    }
-
-    function updatePersonnelDisplay() {
-        renderSelectedTags();
-        const names = Array.from(currentSelectedPersonnel);
-        if (names.length > 0) {
-            personnelDisplayArea.innerHTML = '';
-            names.forEach(name => {
-                const tag = document.createElement('span');
-                tag.className = 'personnel-tag';
-                tag.textContent = name;
-                personnelDisplayArea.appendChild(tag);
-            });
-        } else {
-            personnelDisplayArea.innerHTML = '<span class="text-muted">点击选择人员...</span>';
-        }
-        const personnelForBackend = names.map(name => ({ value: name }));
-        hiddenPersonnelInput.value = JSON.stringify(personnelForBackend);
-    }
-
-    if(personnelSelectorModalElement) {
-        personnelSelectorModalElement.addEventListener('show.bs.modal', () => {
-            renderPersonnelList();
-            renderSelectedTags();
-            personnelSearchInput.value = '';
-        });
-    }
-
-    personnelListContainer.addEventListener('change', (event) => {
-        if (event.target.type === 'checkbox') {
-            const name = event.target.value;
-            if (event.target.checked) {
-                currentSelectedPersonnel.add(name);
-            } else {
-                currentSelectedPersonnel.delete(name);
-            }
-            renderSelectedTags();
-        }
-    });
-
-    selectedPersonnelContainer.addEventListener('click', (event) => {
-        if (event.target.classList.contains('remove-tag-btn')) {
-            const name = event.target.dataset.name;
-            currentSelectedPersonnel.delete(name);
-            renderSelectedTags();
-            const checkbox = personnelListContainer.querySelector(`input[value="${CSS.escape(name)}"]`);
-            if (checkbox) checkbox.checked = false;
-        }
-    });
-
-    personnelSearchInput.addEventListener('input', (event) => {
-        renderPersonnelList(event.target.value);
-    });
-
-    personnelSearchInput.addEventListener('keydown', (event) => {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            const newName = event.target.value.trim();
-            if (newName && !allPersonnel.includes(newName)) {
-                currentSelectedPersonnel.add(newName);
-                renderSelectedTags();
-                event.target.value = '';
-                renderPersonnelList();
-            }
-        }
-    });
-
-    document.getElementById('confirmPersonnelSelection').addEventListener('click', updatePersonnelDisplay);
 
     async function deleteTask(taskId, buttonElement) {
         try {

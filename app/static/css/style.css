@@ -86,6 +86,7 @@ body {
     font-weight: 700;
     line-height: 1;
     text-align: center;
+    white-space: nowrap;
     vertical-align: baseline;
     border-radius: .25rem;
     background-color: #e9ecef;
@@ -93,7 +94,6 @@ body {
     margin-right: 5px;
     margin-bottom: 5px;
     max-width: 100px;
-    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -110,44 +110,28 @@ body {
     margin-top: 0.5rem;
 }
 
-.personnel-list-wrapper {
-    max-height: 250px;
-    overflow-y: auto;
-    border: 1px solid #dee2e6;
-    border-radius: .25rem;
-}
-
-#personnelDisplayArea .personnel-tag {
+.personnel-display-area {
     cursor: pointer;
-}
-
-#selected-personnel-container {
-    padding: 0.5rem;
-    border: 1px solid #dee2e6;
-    border-radius: .25rem;
-    margin-bottom: 1rem;
-    min-height: 48px;
+    min-height: 38px;
     display: flex;
     flex-wrap: wrap;
     gap: 5px;
-}
-
-.selected-personnel-tag {
-    display: flex;
     align-items: center;
-    background-color: #0d6efd;
-    color: white;
-    padding: .25em .5em;
-    border-radius: .25rem;
-    font-size: 0.9em;
 }
-
-.selected-personnel-tag .remove-tag-btn {
-    background: none;
-    border: none;
-    color: white;
-    margin-left: 8px;
-    font-size: 1.2em;
-    line-height: 1;
-    padding: 0;
+.personnel-selector-popover {
+    width: 300px;
+}
+.personnel-list-wrapper {
+    max-height: 200px;
+    overflow-y: auto;
+}
+.list-group-item label {
+    cursor: pointer;
+}
+.popover-body {
+    padding: 0.5rem;
+}
+.list-group-flush .list-group-item {
+    padding-left: 0.5rem;
+    padding-right: 0.5rem;
 }
