@@ -256,7 +256,8 @@ def export_excel():
     for task in tasks:
         if task.task_date in schedule_by_day:
             personnel_str = ", ".join([a.personnel_name for a in task.assignments])
-            schedule_by_day[task.task_date].append(f"{task.content} ({personnel_str})")
+            formatted_string = f"{task.content}\n({personnel_str})"
+            schedule_by_day[task.task_date].append(formatted_string)
 
     max_rows = 0
     if schedule_by_day:
