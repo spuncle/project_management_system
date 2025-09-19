@@ -11,7 +11,6 @@ function showToast(message, type = 'info') {
     const closeButton = toastElement.querySelector('.btn-close');
     const toast = new bootstrap.Toast(toastElement);
 
-    // 移除所有可能的颜色类，确保背景干净
     toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary', 'bg-light', 'text-dark');
     closeButton.classList.remove('btn-close-white');
     
@@ -88,7 +87,7 @@ document.addEventListener('DOMContentLoaded', function () {
             return contentEl;
         },
         placement: 'bottom',
-        trigger: 'focus',
+        trigger: 'click',
         customClass: 'personnel-popover'
     });
 
@@ -98,6 +97,13 @@ document.addEventListener('DOMContentLoaded', function () {
         const searchInput = popoverTip.querySelector('.personnel-search-input');
         if (searchInput) {
             searchInput.focus();
+        }
+    });
+
+    window.addEventListener('click', function (e) {
+        const popoverTip = popover.tip;
+        if (popoverTip && popoverTip.classList.contains('show') && !personnelDisplayArea.contains(e.target) && !popoverTip.contains(e.target)) {
+            popover.hide();
         }
     });
 
@@ -358,9 +364,10 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     formStartDate.addEventListener('change', function() {
-        if (!formEndDate.value || formEndDate.value < this.value) {
-            formEndDate.value = this.value;
+        const endDateInput = document.getElementById('taskFormEndDate');
+        if (!endDateInput.value || endDateInput.value < this.value) {
+            endDateInput.value = this.value;
         }
-        formEndDate.min = this.value;
+        endDateInput.min = this.value;
     });
 });

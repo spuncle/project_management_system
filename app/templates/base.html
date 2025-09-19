@@ -82,7 +82,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">人员</label>
-                            <div id="personnelDisplayArea" class="form-control personnel-display-area" tabindex="0">
+                            <div id="personnelDisplayArea" class="form-control personnel-display-area">
                                 <span class="text-muted">点击选择人员...</span>
                             </div>
                             <input type="hidden" name="personnel" id="taskFormPersonnel">
@@ -108,32 +108,7 @@
     </div>
     
     <div class="modal fade" id="conflictResolutionModal" tabindex="-1" aria-labelledby="conflictResolutionModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="conflictResolutionModalLabel"><i class="bi bi-exclamation-triangle-fill text-warning"></i> 保存冲突</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p>在您编辑期间，该任务已被他人修改。请检查差异并选择您的操作。</p>
-                    <div class="row">
-                        <div class="col-md-6">
-                            <h6>数据库中的当前版本</h6>
-                            <div class="p-2 bg-light rounded border" id="conflictCurrentContent" style="white-space: pre-wrap; min-height: 100px;"></div>
-                        </div>
-                        <div class="col-md-6">
-                            <h6>您试图保存的版本</h6>
-                            <div class="p-2 bg-white rounded border" id="conflictYourContent" style="white-space: pre-wrap; min-height: 100px;"></div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" id="conflictDiscardBtn" data-bs-dismiss="modal">放弃我的修改</button>
-                    <button type="button" class="btn btn-primary" id="conflictOverwriteBtn">强制覆盖</button>
-                </div>
-            </div>
         </div>
-    </div>
     
     <div id="personnel-popover-content-template" class="d-none">
         <div class="personnel-selector-popover">
