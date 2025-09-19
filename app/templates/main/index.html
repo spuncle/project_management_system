@@ -46,36 +46,22 @@
                         {% for task in schedule_by_day[day] %}
                         <div class="task-card" data-task-id="{{ task.id }}" data-task-version="{{ task.version }}">
                             <div class="task-content">{{ task.content }}</div>
-                            <div class="personnel-tags">
-                                {% for assignment in task.assignments %}
-                                <span class="personnel-tag">{{ assignment.personnel_name }}</span>
-                                {% endfor %}
-                            </div>
                             <div class="task-footer">
-                                <small class="text-muted"></small> 
-                                {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
-                                <div class="task-controls">
-                                    <div class="dropdown">
-                                        <button class="btn btn-sm btn-light py-0 px-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                            <i class="bi bi-three-dots-vertical"></i>
-                                        </button>
-                                        <ul class="dropdown-menu">
-                                            {% if current_user.is_admin or current_user.can_edit %}
-                                            <li>
-                                                <a class="dropdown-item edit-task-btn" href="#" data-bs-toggle="modal" data-bs-target="#taskModal" data-task-id="{{ task.id }}">
-                                                    <i class="bi bi-pencil-fill me-2"></i>编辑
-                                                </a>
-                                            </li>
-                                            {% endif %}
-                                            {% if current_user.is_admin or current_user.can_delete %}
-                                            <li>
-                                                <a class="dropdown-item delete-task-btn text-danger" href="#" data-task-id="{{ task.id }}">
-                                                    <i class="bi bi-trash-fill me-2"></i>删除
-                                                </a>
-                                            </li>
-                                            {% endif %}
-                                        </ul>
+                                <div class="personnel-display">
+                                    <div class="personnel-tags">
+                                        {% for assignment in task.assignments %}
+                                        <span class="personnel-tag">{{ assignment.personnel_name }}</span>
+                                        {% endfor %}
                                     </div>
+                                </div>
+                                {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
+                                <div class="task-controls-hover">
+                                    {% if current_user.is_admin or current_user.can_edit %}
+                                    <button class="btn btn-sm btn-light py-0 px-1 edit-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-task-id="{{ task.id }}"><i class="bi bi-pencil-fill"></i></button>
+                                    {% endif %}
+                                    {% if current_user.is_admin or current_user.can_delete %}
+                                    <button class="btn btn-sm btn-light py-0 px-1 delete-task-btn" data-task-id="{{ task.id }}"><i class="bi bi-trash-fill"></i></button>
+                                    {% endif %}
                                 </div>
                                 {% endif %}
                             </div>
