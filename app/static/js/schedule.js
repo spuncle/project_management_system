@@ -1,22 +1,12 @@
-/**
- * 全局 Toast (浮动提示) 显示函数
- * @param {string} message - 要显示的消息内容
- * @param {string} type - 消息类型 ('info', 'success', 'danger', 'warning')
- */
 function showToast(message, type = 'info') {
     const toastElement = document.getElementById('appToast');
     if (!toastElement) return;
-
     const toastBody = toastElement.querySelector('.toast-body');
     const closeButton = toastElement.querySelector('.btn-close');
     const toast = new bootstrap.Toast(toastElement);
-
     toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary', 'bg-light', 'text-dark');
     closeButton.classList.remove('btn-close-white');
-    
-    // 统一使用浅灰色背景和深色文字/按钮
     toastElement.classList.add('bg-light', 'text-dark');
-
     toastBody.textContent = message;
     toast.show();
 }
@@ -30,7 +20,13 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!taskModalElement || !conflictModalElement || !popoverContentTemplate) {
         return;
     }
-    const taskModal = new bootstrap.Modal(taskModalElement);
+
+    // --- 【修改】在初始化时禁用焦点陷阱 ---
+    const taskModal = new bootstrap.Modal(taskModalElement, {
+        focus: false
+    });
+    // ------------------------------------
+
     const conflictModal = new bootstrap.Modal(conflictModalElement);
     
     const taskForm = document.getElementById('taskForm');
@@ -53,7 +49,6 @@ document.addEventListener('DOMContentLoaded', function () {
         content: function () {
             const contentEl = popoverContentTemplate.cloneNode(true);
             contentEl.classList.remove('d-none');
-
             const searchInput = contentEl.querySelector('.personnel-search-input');
             const listContainer = contentEl.querySelector('.personnel-list-container');
             
@@ -76,11 +71,8 @@ document.addEventListener('DOMContentLoaded', function () {
             listContainer.addEventListener('change', (e) => {
                 if (e.target.type === 'checkbox') {
                     const name = e.target.value;
-                    if (e.target.checked) {
-                        currentSelectedPersonnel.add(name);
-                    } else {
-                        currentSelectedPersonnel.delete(name);
-                    }
+                    if (e.target.checked) { currentSelectedPersonnel.add(name); } 
+                    else { currentSelectedPersonnel.delete(name); }
                     updatePersonnelDisplay();
                 }
             });
@@ -99,7 +91,7 @@ document.addEventListener('DOMContentLoaded', function () {
             searchInput.focus();
         }
     });
-
+    
     window.addEventListener('click', function (e) {
         const popoverTip = popover.tip;
         if (popoverTip && popoverTip.classList.contains('show') && !personnelDisplayArea.contains(e.target) && !popoverTip.contains(e.target)) {
@@ -111,7 +103,6 @@ document.addEventListener('DOMContentLoaded', function () {
         listContainer.innerHTML = '';
         const lowerCaseFilter = filter.toLowerCase();
         const filteredList = allPersonnel.filter(p => p.toLowerCase().includes(lowerCaseFilter));
-
         filteredList.forEach(name => {
             const isChecked = currentSelectedPersonnel.has(name);
             const li = document.createElement('li');
@@ -152,7 +143,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const movedTaskElement = evt.item;
                     const fromContainer = evt.from;
                     const toContainer = evt.to;
-                    
                     const payload = {
                         moved_task: {
                             id: parseInt(movedTaskElement.dataset.taskId),
@@ -163,14 +153,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             task_ids: Array.from(toContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
                         }
                     };
-
                     if (fromContainer !== toContainer) {
                         payload.source_list = {
                             date: fromContainer.dataset.date,
                             task_ids: Array.from(fromContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
                         };
                     }
-                    
                     try {
                         const response = await fetch('/api/reorder_tasks', {
                             method: 'POST',
@@ -343,13 +331,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 task_date: formStartDate.value,
                 version: currentData.version
             };
-
             const response = await fetch(`/api/update_task/${taskId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify(data)
             });
-
             if(response.ok) {
                 location.reload();
             } else {
@@ -357,7 +343,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 conflictModal.hide();
             }
         });
-
         document.getElementById('conflictDiscardBtn').onclick = () => {
             conflictModal.hide();
         };
