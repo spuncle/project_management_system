@@ -41,23 +41,25 @@
         <tbody>
             <tr>
             {% for day in week_dates %}
-                <td class="align-top" style="min-width: 180px; vertical-align: top!important;">
+                <td class="align-top" style="vertical-align: top!important;">
                     <div class="task-list-container" data-date="{{ day.strftime('%Y-%m-%d') }}" id="task-list-{{ day.strftime('%Y%m%d') }}">
                         {% for task in schedule_by_day[day] %}
                         <div class="task-card" data-task-id="{{ task.id }}" data-task-version="{{ task.version }}">
                             <div class="task-content">{{ task.content }}</div>
+                            <div class="personnel-tags">
+                                {% for assignment in task.assignments %}
+                                <span class="personnel-tag">{{ assignment.personnel_name }}</span>
+                                {% endfor %}
+                            </div>
                             <div class="task-footer">
-                                <small class="text-muted"><i class="bi bi-person"></i> {{ task.personnel }}</small>
+                                <small class="text-muted">ID: {{task.id}}</small>
                                 {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
                                 <div class="task-controls">
                                     {% if current_user.is_admin or current_user.can_edit %}
                                     <button class="btn btn-sm btn-light py-0 px-1 edit-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-task-id="{{ task.id }}"><i class="bi bi-pencil-fill"></i></button>
                                     {% endif %}
                                     {% if current_user.is_admin or current_user.can_delete %}
-                                    <form action="{{ url_for('main.delete_task', task_id=task.id) }}" method="POST" class="d-inline">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                        <button type="submit" class="btn btn-sm btn-light py-0 px-1"><i class="bi bi-trash-fill"></i></button>
-                                    </form>
+                                    <button class="btn btn-sm btn-light py-0 px-1 delete-task-btn" data-task-id="{{ task.id }}"><i class="bi bi-trash-fill"></i></button>
                                     {% endif %}
                                 </div>
                                 {% endif %}

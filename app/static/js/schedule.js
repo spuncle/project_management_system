@@ -84,6 +84,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.body.addEventListener('click', async function(event) {
         const addBtn = event.target.closest('.add-task-btn');
         const editBtn = event.target.closest('.edit-task-btn');
+        const deleteBtn = event.target.closest('.delete-task-btn');
 
         if (addBtn) {
             taskModalLabel.textContent = '添加新任务';
@@ -121,7 +122,32 @@ document.addEventListener('DOMContentLoaded', function () {
                 alert('网络错误，无法加载任务详情。');
             }
         }
+
+        if (deleteBtn) {
+            const taskId = deleteBtn.dataset.taskId;
+            deleteTask(taskId, deleteBtn);
+        }
     });
+
+    async function deleteTask(taskId, buttonElement) {
+        try {
+            const response = await fetch(`/api/delete_task/${taskId}`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken }
+            });
+            const data = await response.json();
+            if (data.success) {
+                const card = buttonElement.closest('.task-card');
+                const container = card.parentElement;
+                card.remove();
+                checkAndToggleEmptyPlaceholder(container);
+            } else {
+                alert(data.error || '删除失败。');
+            }
+        } catch (error) {
+            alert('网络错误，删除失败。');
+        }
+    }
 
     taskForm.addEventListener('submit', async function(event) {
         event.preventDefault();

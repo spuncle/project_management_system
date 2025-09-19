@@ -52,7 +52,7 @@
 
     <main class="container">
         {% include '_flash_messages.html' %}
-        {% block content %}{}{% endblock %}
+        {% block content %}{% endblock %}
     </main>
     
     <div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel" aria-hidden="true">
@@ -74,6 +74,7 @@
                         <div class="mb-3">
                             <label for="taskFormPersonnel" class="form-label">人员</label>
                             <input type="text" name="personnel" id="taskFormPersonnel" class="form-control" list="personnel-options" required>
+                            <small class="form-text text-muted">单人可直接输入/选择，多人请用英文逗号“,”分隔。</small>
                         </div>
                         <div class="row">
                             <div class="col">

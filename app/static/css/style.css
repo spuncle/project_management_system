@@ -2,8 +2,15 @@ body {
     background-color: #f8f9fa;
 }
 
+/* --- 【修改】固定表格布局 --- */
+.table-bordered {
+    table-layout: fixed;
+    width: 100%;
+}
+
 .table th, .table td {
     vertical-align: middle;
+    word-wrap: break-word; /* 强制长内容换行 */
 }
 
 /* 任务卡片样式 */
@@ -30,13 +37,38 @@ body {
 .task-footer {
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: flex-end; /* 底部对齐 */
     font-size: 0.8rem;
+    flex-wrap: wrap; /* 换行 */
 }
+
+/* --- 【新增】人员标签样式 --- */
+.personnel-tags {
+    margin-top: 5px;
+}
+.personnel-tag {
+    display: inline-block;
+    padding: .25em .6em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: .25rem;
+    background-color: #e9ecef;
+    color: #495057;
+    margin-right: 5px;
+    margin-bottom: 5px;
+}
+
 
 .task-controls {
     opacity: 0;
     transition: opacity 0.2s ease-in-out;
+    flex-shrink: 0; /* 防止被挤压 */
+    margin-left: auto; /* 推到最右侧 */
+    padding-left: 10px;
 }
 
 .task-card:hover .task-controls {
@@ -49,10 +81,10 @@ body {
     border: 1px dashed #6366f1;
 }
 
-/* --- 新增的“(空)”占位符样式 --- */
+/* “(空)”占位符样式 */
 .empty-day-placeholder {
     font-size: 0.85rem;
-    color: #adb5bd; /* Bootstrap 风格的浅灰色 */
+    color: #adb5bd;
     text-align: center;
     margin-top: 0.5rem;
 }
