@@ -21,6 +21,8 @@ body {
     cursor: grab;
     user-select: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    display: flex;
+    flex-direction: column;
 }
 
 .task-card:active {
@@ -30,52 +32,48 @@ body {
 .task-content {
     margin-bottom: 0.5rem;
     word-wrap: break-word;
+    flex-grow: 1;
 }
 
-/* --- 【关键修正】重写 task-footer 样式以支持图层覆盖 --- */
 .task-footer {
-    position: relative; /* 设为相对定位，作为子元素的定位基准 */
-    min-height: 28px;   /* 确保即使人员为空，也有足够的高度容纳按钮 */
-    display: flex;
+    display: grid;
     align-items: center;
+    margin-top: auto;
+    padding-top: 0.5rem;
+    border-top: 1px solid #f1f5f9;
 }
 
 .personnel-display, .task-controls-hover {
-    position: absolute; /* 两个子元素都绝对定位，会重叠在一起 */
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
+    grid-area: 1 / 1 / 2 / 2;
+    transition: opacity 0.2s ease-in-out;
     display: flex;
     align-items: center;
-    transition: opacity 0.2s ease-in-out; /* 添加平滑过渡效果 */
 }
 
 .personnel-display {
-    opacity: 1; /* 人员列表默认可见 */
+    opacity: 1;
 }
 
 .task-controls-hover {
-    opacity: 0; /* 操作按钮默认透明 */
-    justify-content: flex-end; /* 按钮靠右对齐 */
+    opacity: 0;
+    justify-self: end;
 }
 
-/* --- 【关键规则】实现悬浮效果 --- */
 .task-card:hover .personnel-display {
-    opacity: 0; /* 鼠标悬浮在卡片上时，人员列表变透明 */
+    opacity: 0.15;
 }
 
 .task-card:hover .task-controls-hover {
-    opacity: 1; /* 鼠标悬浮在卡片上时，操作按钮变得可见 */
+    opacity: 1;
 }
-/* ----------------------------------------------- */
-
 
 .personnel-tags {
-    margin-top: 5px;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
+    /* 新增，防止标签容器溢出 */
+    overflow: hidden;
+    max-width: 100%;
 }
 
 .personnel-tag {
@@ -85,13 +83,19 @@ body {
     font-weight: 700;
     line-height: 1;
     text-align: center;
-    white-space: nowrap;
     vertical-align: baseline;
     border-radius: .25rem;
     background-color: #e9ecef;
     color: #495057;
     margin-right: 5px;
     margin-bottom: 5px;
+    
+    /* --- 【新增】文本截断样式 --- */
+    max-width: 100px; /* 您可以根据需要调整标签的最大宽度 */
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    /* -------------------------- */
 }
 
 .blue-background-class {

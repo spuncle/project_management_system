@@ -50,7 +50,8 @@
                                 <div class="personnel-display">
                                     <div class="personnel-tags">
                                         {% for assignment in task.assignments %}
-                                        <span class="personnel-tag">{{ assignment.personnel_name }}</span>
+                                        {# --- 【修改】增加了 title 属性 --- #}
+                                        <span class="personnel-tag" title="{{ assignment.personnel_name }}">{{ assignment.personnel_name }}</span>
                                         {% endfor %}
                                     </div>
                                 </div>
