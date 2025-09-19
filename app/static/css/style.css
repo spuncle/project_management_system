@@ -18,14 +18,18 @@ body {
     padding: 0.75rem;
     margin-bottom: 0.5rem;
     background-color: #fff;
-    cursor: grab;
     user-select: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     display: flex;
     flex-direction: column;
 }
 
-.task-card:active {
+/* --- 【修改】只有带交互功能的卡片才有抓取手势 --- */
+.task-card-interactive {
+    cursor: grab;
+}
+
+.task-card-interactive:active {
     cursor: grabbing;
 }
 
@@ -59,16 +63,17 @@ body {
     justify-self: end;
 }
 
-/* --- 【关键修正】--- */
-.task-card:hover .personnel-display {
-    opacity: 0.3; /* 1. 按您的要求修改透明度 */
-    pointer-events: none; /* 2. 让这个半透明层可以被“点击穿透” */
+/* --- 【修改】悬浮效果只对带交互功能的卡片生效 --- */
+.task-card-interactive:hover .personnel-display {
+    opacity: 0.2;
+    pointer-events: none;
 }
-/* ------------------ */
 
-.task-card:hover .task-controls-hover {
+.task-card-interactive:hover .task-controls-hover {
     opacity: 1;
 }
+/* ----------------------------------------------- */
+
 
 .personnel-tags {
     display: flex;

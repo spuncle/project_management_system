@@ -42,29 +42,39 @@
             <tr>
             {% for day in week_dates %}
                 <td class="align-top" style="vertical-align: top!important;">
-                    <div class="task-list-container" data-date="{{ day.strftime('%Y-%m-%d') }}" id="task-list-{{ day.strftime('%Y%m%d') }}">
+                    <div class="task-list-container" data-date="{{ day.strftime('%Y-%m-%d') }}" id="task-list-{{ day.strftime('%Ym%d') }}">
                         {% for task in schedule_by_day[day] %}
-                        <div class="task-card" data-task-id="{{ task.id }}" data-task-version="{{ task.version }}">
+                        
+                        {# --- 【修改】使用 set 块来捕捉渲染内容 --- #}
+                        {% set controls_html %}
+                            {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
+                            <div class="task-controls-hover">
+                                {% if current_user.is_admin or current_user.can_edit %}
+                                <button class="btn btn-sm btn-light py-0 px-1 edit-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-task-id="{{ task.id }}"><i class="bi bi-pencil-fill"></i></button>
+                                {% endif %}
+                                {% if current_user.is_admin or current_user.can_delete %}
+                                <button class="btn btn-sm btn-light py-0 px-1 delete-task-btn" data-task-id="{{ task.id }}"><i class="bi bi-trash-fill"></i></button>
+                                {% endif %}
+                                {# 未来若有新按钮，只需在这里添加新的 if 判断即可 #}
+                            </div>
+                            {% endif %}
+                        {% endset %}
+
+                        {# --- 【修改】根据捕捉到的内容是否为空来判断 --- #}
+                        {% set has_controls = controls_html|trim != "" %}
+                        
+                        <div class="task-card {% if has_controls %}task-card-interactive{% endif %}" data-task-id="{{ task.id }}" data-task-version="{{ task.version }}">
                             <div class="task-content">{{ task.content }}</div>
                             <div class="task-footer">
                                 <div class="personnel-display">
                                     <div class="personnel-tags">
                                         {% for assignment in task.assignments %}
-                                        {# --- 【修改】增加了 title 属性 --- #}
                                         <span class="personnel-tag" title="{{ assignment.personnel_name }}">{{ assignment.personnel_name }}</span>
                                         {% endfor %}
                                     </div>
                                 </div>
-                                {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
-                                <div class="task-controls-hover">
-                                    {% if current_user.is_admin or current_user.can_edit %}
-                                    <button class="btn btn-sm btn-light py-0 px-1 edit-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-task-id="{{ task.id }}"><i class="bi bi-pencil-fill"></i></button>
-                                    {% endif %}
-                                    {% if current_user.is_admin or current_user.can_delete %}
-                                    <button class="btn btn-sm btn-light py-0 px-1 delete-task-btn" data-task-id="{{ task.id }}"><i class="bi bi-trash-fill"></i></button>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
+                                {# --- 【修改】直接输出已渲染好的 HTML --- #}
+                                {{ controls_html|safe }}
                             </div>
                         </div>
                         {% endfor %}
