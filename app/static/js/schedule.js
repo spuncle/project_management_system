@@ -1,3 +1,8 @@
+/**
+ * 全局 Toast (浮动提示) 显示函数
+ * @param {string} message - 要显示的消息内容
+ * @param {string} type - 消息类型 ('info', 'success', 'danger', 'warning')
+ */
 function showToast(message, type = 'info') {
     const toastElement = document.getElementById('appToast');
     if (!toastElement) return;
@@ -16,6 +21,7 @@ function showToast(message, type = 'info') {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
+    // --- 1. 变量定义与初始化 ---
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const taskModalElement = document.getElementById('taskModal');
     const conflictModalElement = document.getElementById('conflictResolutionModal');
@@ -42,6 +48,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentSelectedPersonnel = new Set();
     const allPersonnel = typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [];
     
+    // --- 2. 人员选择器 (Popover) 核心逻辑 ---
     const popover = new bootstrap.Popover(personnelDisplayArea, {
         html: true,
         content: popoverContentTemplate.innerHTML,
@@ -52,7 +59,8 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     personnelDisplayArea.addEventListener('shown.bs.popover', () => {
-        const popoverTip = document.getElementById(personnelDisplayArea.getAttribute('aria-describedby'));
+        // 【关键修正】使用 popover 实例自身的 .tip 属性来安全地找到 popover 元素
+        const popoverTip = popover.tip; 
         if (!popoverTip) return;
 
         const searchInput = popoverTip.querySelector('.personnel-search-input');
@@ -95,7 +103,7 @@ document.addEventListener('DOMContentLoaded', function () {
         filteredList.forEach(name => {
             const isChecked = currentSelectedPersonnel.has(name);
             const li = document.createElement('li');
-            li.className = 'list-group-item border-0';
+            li.className = 'list-group-item border-0 p-1';
             li.innerHTML = `
                 <input class="form-check-input me-2" type="checkbox" value="${name}" id="personnel-check-${name.replace(/\s+/g, '-')}" ${isChecked ? 'checked' : ''}>
                 <label class="form-check-label w-100" for="personnel-check-${name.replace(/\s+/g, '-')}">${name}</label>
@@ -121,6 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
         hiddenPersonnelInput.value = JSON.stringify(personnelForBackend);
     }
     
+    // --- 3. 拖拽排序功能 ---
     if (typeof USER_CAN_EDIT !== 'undefined' && USER_CAN_EDIT) {
         document.querySelectorAll('.task-list-container').forEach(container => {
             new Sortable(container, {
@@ -156,13 +165,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify(payload)
                         });
-
                         if (!response.ok) {
                             const errorData = await response.json();
                             showToast(errorData.error || "操作失败，页面将刷新以同步最新状态。", 'danger');
                             setTimeout(() => location.reload(), 2000);
                         } else {
-                            location.reload();
+                             location.reload();
                         }
                     } catch (error) {
                         showToast("网络错误，操作失败。页面将刷新。", 'danger');
@@ -173,6 +181,7 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    // --- 4. 其他辅助与事件监听函数 ---
     function checkAndToggleEmptyPlaceholder(container) {
         if (!container) return;
         const placeholder = container.querySelector('.empty-day-placeholder');
