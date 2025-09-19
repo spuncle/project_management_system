@@ -1,4 +1,3 @@
-// --- 【修改】Toast 函数，统一使用灰色系 ---
 function showToast(message, type = 'info') {
     const toastElement = document.getElementById('appToast');
     if (!toastElement) return;
@@ -7,27 +6,28 @@ function showToast(message, type = 'info') {
     const closeButton = toastElement.querySelector('.btn-close');
     const toast = new bootstrap.Toast(toastElement);
 
-    // 移除所有可能的颜色类
     toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary');
     
-    // 统一设置为灰色系，并确保关闭按钮可见
-    toastElement.classList.add('text-bg-secondary'); // Bootstrap 的标准灰色
-    closeButton.classList.add('btn-close-white'); // 在深色背景上使用白色关闭按钮
+    toastElement.classList.add('text-bg-secondary');
+    closeButton.classList.add('btn-close-white');
 
     toastBody.textContent = message;
     toast.show();
 }
 
-
 document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const taskModalElement = document.getElementById('taskModal');
     const conflictModalElement = document.getElementById('conflictResolutionModal');
-    if (!taskModalElement || !conflictModalElement) {
+    const personnelSelectorModalElement = document.getElementById('personnelSelectorModal');
+    
+    if (!taskModalElement || !conflictModalElement || !personnelSelectorModalElement) {
         return;
     }
     const taskModal = new bootstrap.Modal(taskModalElement);
     const conflictModal = new bootstrap.Modal(conflictModalElement);
+    const personnelSelectorModal = new bootstrap.Modal(personnelSelectorModalElement);
+
     const taskForm = document.getElementById('taskForm');
     const taskModalLabel = document.getElementById('taskModalLabel');
     const formTaskId = document.getElementById('taskFormTaskId');
@@ -38,16 +38,15 @@ document.addEventListener('DOMContentLoaded', function () {
     const formStartDate = document.getElementById('taskFormStartDate');
     const formEndDate = document.getElementById('taskFormEndDate');
 
-    const personnelInput = document.getElementById('taskFormPersonnel');
-    const tagify = new Tagify(personnelInput, {
-        whitelist: typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [],
-        dropdown: {
-            maxItems: 20,
-            enabled: 0,
-            closeOnSelect: false
-        }
-    });
+    const personnelDisplayArea = document.getElementById('personnelDisplayArea');
+    const hiddenPersonnelInput = document.getElementById('taskFormPersonnel');
+    const personnelListContainer = document.getElementById('personnel-list-container');
+    const selectedPersonnelContainer = document.getElementById('selected-personnel-container');
+    const personnelSearchInput = document.getElementById('personnelSearchInput');
 
+    let currentSelectedPersonnel = new Set();
+    const allPersonnel = typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [];
+    
     if (typeof USER_CAN_EDIT !== 'undefined' && USER_CAN_EDIT) {
         document.querySelectorAll('.task-list-container').forEach(container => {
             new Sortable(container, {
@@ -83,17 +82,14 @@ document.addEventListener('DOMContentLoaded', function () {
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify(payload)
                         });
-
                         if (!response.ok) {
                             const errorData = await response.json();
                             showToast(errorData.error || "操作失败，页面将刷新以同步最新状态。", 'danger');
-                            setTimeout(() => location.reload(), 2000);
-                        } else {
-                             location.reload();
                         }
                     } catch (error) {
                         showToast("网络错误，操作失败。页面将刷新。", 'danger');
-                        setTimeout(() => location.reload(), 2000);
+                    } finally {
+                        setTimeout(() => location.reload(), 1500);
                     }
                 }
             });
@@ -123,8 +119,9 @@ document.addEventListener('DOMContentLoaded', function () {
             taskModalLabel.textContent = '添加新任务';
             formAction.value = 'add';
             taskForm.reset();
-            tagify.removeAllTags();
             formTaskId.value = '';
+            currentSelectedPersonnel.clear();
+            updatePersonnelDisplay();
             const date = addBtn.dataset.date;
             formStartDate.value = date;
             formEndDate.value = date;
@@ -137,7 +134,7 @@ document.addEventListener('DOMContentLoaded', function () {
             taskModalLabel.textContent = '编辑任务';
             formAction.value = 'edit';
             taskForm.reset();
-            tagify.removeAllTags();
+            currentSelectedPersonnel.clear();
             const taskId = editBtn.dataset.taskId;
             try {
                 const response = await fetch(`/api/get_task/${taskId}`);
@@ -145,18 +142,13 @@ document.addEventListener('DOMContentLoaded', function () {
                     const task = await response.json();
                     formTaskId.value = task.id;
                     formContent.value = task.content;
-                    tagify.addTags(task.personnel);
+                    task.personnel.forEach(p => currentSelectedPersonnel.add(p));
+                    updatePersonnelDisplay();
                     formStartDate.value = task.task_date;
                     formVersion.value = task.version;
                     formEndDate.parentElement.parentElement.style.display = 'none';
-                } else {
-                    showToast('无法加载任务详情，请刷新页面后重试。', 'danger');
-                    taskModal.hide();
-                }
-            } catch (error) {
-                console.error("加载任务详情失败:", error);
-                showToast('网络错误，无法加载任务详情。', 'danger');
-            }
+                } else { showToast('无法加载任务详情。', 'danger'); taskModal.hide(); }
+            } catch (error) { showToast('网络错误，无法加载任务详情。', 'danger'); }
         }
 
         if (deleteBtn) {
@@ -165,6 +157,100 @@ document.addEventListener('DOMContentLoaded', function () {
             deleteTask(taskId, deleteBtn);
         }
     });
+
+    function renderPersonnelList(filter = '') {
+        personnelListContainer.innerHTML = '';
+        const filteredPersonnel = allPersonnel.filter(p => p.toLowerCase().includes(filter.toLowerCase()));
+        filteredPersonnel.forEach(name => {
+            const isChecked = currentSelectedPersonnel.has(name);
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.innerHTML = `<input class="form-check-input me-2" type="checkbox" value="${name}" id="personnel-${name.replace(/\s+/g, '-')}" ${isChecked ? 'checked' : ''}><label class="form-check-label w-100" for="personnel-${name.replace(/\s+/g, '-')}">${name}</label>`;
+            personnelListContainer.appendChild(li);
+        });
+    }
+
+    function renderSelectedTags() {
+        selectedPersonnelContainer.innerHTML = '';
+        currentSelectedPersonnel.forEach(name => {
+            const tag = document.createElement('div');
+            tag.className = 'selected-personnel-tag';
+            tag.textContent = name;
+            const removeBtn = document.createElement('button');
+            removeBtn.className = 'remove-tag-btn';
+            removeBtn.innerHTML = '&times;';
+            removeBtn.dataset.name = name;
+            tag.appendChild(removeBtn);
+            selectedPersonnelContainer.appendChild(tag);
+        });
+    }
+
+    function updatePersonnelDisplay() {
+        renderSelectedTags();
+        const names = Array.from(currentSelectedPersonnel);
+        if (names.length > 0) {
+            personnelDisplayArea.innerHTML = '';
+            names.forEach(name => {
+                const tag = document.createElement('span');
+                tag.className = 'personnel-tag';
+                tag.textContent = name;
+                personnelDisplayArea.appendChild(tag);
+            });
+        } else {
+            personnelDisplayArea.innerHTML = '<span class="text-muted">点击选择人员...</span>';
+        }
+        const personnelForBackend = names.map(name => ({ value: name }));
+        hiddenPersonnelInput.value = JSON.stringify(personnelForBackend);
+    }
+
+    if(personnelSelectorModalElement) {
+        personnelSelectorModalElement.addEventListener('show.bs.modal', () => {
+            renderPersonnelList();
+            renderSelectedTags();
+            personnelSearchInput.value = '';
+        });
+    }
+
+    personnelListContainer.addEventListener('change', (event) => {
+        if (event.target.type === 'checkbox') {
+            const name = event.target.value;
+            if (event.target.checked) {
+                currentSelectedPersonnel.add(name);
+            } else {
+                currentSelectedPersonnel.delete(name);
+            }
+            renderSelectedTags();
+        }
+    });
+
+    selectedPersonnelContainer.addEventListener('click', (event) => {
+        if (event.target.classList.contains('remove-tag-btn')) {
+            const name = event.target.dataset.name;
+            currentSelectedPersonnel.delete(name);
+            renderSelectedTags();
+            const checkbox = personnelListContainer.querySelector(`input[value="${CSS.escape(name)}"]`);
+            if (checkbox) checkbox.checked = false;
+        }
+    });
+
+    personnelSearchInput.addEventListener('input', (event) => {
+        renderPersonnelList(event.target.value);
+    });
+
+    personnelSearchInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            const newName = event.target.value.trim();
+            if (newName && !allPersonnel.includes(newName)) {
+                currentSelectedPersonnel.add(newName);
+                renderSelectedTags();
+                event.target.value = '';
+                renderPersonnelList();
+            }
+        }
+    });
+
+    document.getElementById('confirmPersonnelSelection').addEventListener('click', updatePersonnelDisplay);
 
     async function deleteTask(taskId, buttonElement) {
         try {
@@ -204,7 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const taskId = formTaskId.value;
                 const data = {
                     content: formContent.value,
-                    personnel: tagify.value,
+                    personnel: JSON.parse(hiddenPersonnelInput.value),
                     task_date: formStartDate.value,
                     version: parseInt(formVersion.value)
                 };
@@ -221,7 +307,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const errorData = await response.json();
                 handleConflict(errorData.current_data, {
                     content: formContent.value,
-                    personnel: tagify.value.map(tag => tag.value),
+                    personnel: JSON.parse(hiddenPersonnelInput.value).map(tag => tag.value),
                 });
             } else {
                 const errorData = await response.json().catch(() => ({ error: '服务器返回了一个未知错误。' }));
@@ -250,7 +336,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const taskId = formTaskId.value;
             const data = {
                 content: formContent.value,
-                personnel: tagify.value,
+                personnel: JSON.parse(hiddenPersonnelInput.value),
                 task_date: formStartDate.value,
                 version: currentData.version
             };

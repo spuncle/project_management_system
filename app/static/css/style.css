@@ -18,7 +18,6 @@ body {
     padding: 0.75rem;
     margin-bottom: 0.5rem;
     background-color: #fff;
-    cursor: grab;
     user-select: none;
     box-shadow: 0 1px 3px rgba(0,0,0,0.05);
     display: flex;
@@ -111,29 +110,44 @@ body {
     margin-top: 0.5rem;
 }
 
-.tagify{
-    --tags-border-color: #dee2e6;
-}
-.tagify:hover{
-    --tags-border-color: #86b7fe;
-}
-.tagify.tagify--focus{
-    --tags-border-color: #86b7fe;
+.personnel-list-wrapper {
+    max-height: 250px;
+    overflow-y: auto;
+    border: 1px solid #dee2e6;
+    border-radius: .25rem;
 }
 
-/* --- 【修改】Tagify 下拉框样式优化 --- */
-.tagify__dropdown__wrapper {
-    /* 让下拉框宽度自适应最长内容的宽度 */
-    width: max-content;
-    /* 同时确保它的宽度至少和输入框一样宽，避免在内容很短时变得太窄 */
-    min-width: 100%;
-    /* 同时设置一个最大宽度，防止某个极长的名字破坏整体布局 */
-    max-width: 450px; 
+#personnelDisplayArea .personnel-tag {
+    cursor: pointer;
 }
 
-.tagify__dropdown__item {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+#selected-personnel-container {
+    padding: 0.5rem;
+    border: 1px solid #dee2e6;
+    border-radius: .25rem;
+    margin-bottom: 1rem;
+    min-height: 48px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
 }
-/* ----------------------------------- */
+
+.selected-personnel-tag {
+    display: flex;
+    align-items: center;
+    background-color: #0d6efd;
+    color: white;
+    padding: .25em .5em;
+    border-radius: .25rem;
+    font-size: 0.9em;
+}
+
+.selected-personnel-tag .remove-tag-btn {
+    background: none;
+    border: none;
+    color: white;
+    margin-left: 8px;
+    font-size: 1.2em;
+    line-height: 1;
+    padding: 0;
+}

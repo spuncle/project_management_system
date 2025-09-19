@@ -5,10 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ title or '项目管理系统' }}</title>
-
     <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.css') }}">
-    <link href="{{ url_for('static', filename='vendor/tagify.css') }}" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -83,8 +81,11 @@
                             <textarea name="content" id="taskFormContent" class="form-control" rows="3" required></textarea>
                         </div>
                         <div class="mb-3">
-                            <label for="taskFormPersonnel" class="form-label">人员</label>
-                            <input type="text" name="personnel" id="taskFormPersonnel" class="form-control" required>
+                            <label class="form-label">人员</label>
+                            <div id="personnelDisplayArea" class="form-control" data-bs-toggle="modal" data-bs-target="#personnelSelectorModal" style="cursor: pointer;">
+                                <span class="text-muted">点击选择人员...</span>
+                            </div>
+                            <input type="hidden" name="personnel" id="taskFormPersonnel">
                         </div>
                         <div class="row">
                             <div class="col">
@@ -133,11 +134,34 @@
             </div>
         </div>
     </div>
+    
+    <div class="modal fade" id="personnelSelectorModal" tabindex="-1" aria-labelledby="personnelSelectorModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="personnelSelectorModalLabel">选择人员</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-2" id="selected-personnel-container">
+                        </div>
+                    <div class="mb-3">
+                        <input type="search" id="personnelSearchInput" class="form-control" placeholder="搜索或添加新人员...">
+                    </div>
+                    <div class="personnel-list-wrapper">
+                        <ul class="list-group" id="personnel-list-container">
+                            </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-primary" id="confirmPersonnelSelection" data-bs-dismiss="modal">确定</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/Sortable.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/tagify.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/tagify.polyfills.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/schedule.js') }}"></script>
     
     <script>
