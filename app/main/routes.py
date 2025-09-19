@@ -253,14 +253,13 @@ def export_excel():
         flash('该周没有可导出的数据。', 'warning')
         return redirect(url_for('main.index', start_date=start_date_str))
 
-    # --- 【修改】重写 Excel 导出逻辑 ---
     schedule_by_day = {day: [] for day in week_dates}
     for task in tasks:
         if task.task_date in schedule_by_day:
             personnel_str = ", ".join([a.personnel_name for a in task.assignments])
-            # 为每个任务添加两行
+            # --- 【修改】为每个任务添加两行：一行内容，一行人员 ---
             schedule_by_day[task.task_date].append(task.content)
-            schedule_by_day[task.task_date].append(f"({personnel_str})")
+            schedule_by_day[task.task_date].append(personnel_str)
 
     max_rows = 0
     if schedule_by_day:
@@ -273,19 +272,20 @@ def export_excel():
         data_dict[day_str] = tasks_for_day + [''] * (max_rows - len(tasks_for_day))
 
     df = pd.DataFrame(data_dict)
-    # ------------------------------------
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='周工作计划')
         worksheet = writer.sheets['周工作计划']
         
-        # 定义样式
+        # --- 【修改】定义样式 ---
         header_font = Font(bold=True)
         content_font = Font(bold=True)
-        personnel_font = Font(italic=True, color="808080") # 斜体灰色
-        thin_border = Border(bottom=Side(style='thin'))
-        alignment = Alignment(wrap_text=True, vertical='top')
+        # 人员使用默认字体
+        
+        # 定义通用边框样式
+        thin_side = Side(style='thin', color="BFBFBF")
+        full_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
 
         for col_idx, col in enumerate(df.columns, 1):
             column_letter = get_column_letter(col_idx)
@@ -295,17 +295,14 @@ def export_excel():
             worksheet[f"{column_letter}1"].font = header_font
             
             # 遍历单元格设置样式
-            # 从第2行开始，因为第1行是表头
             for row_idx in range(2, max_rows + 2):
                 cell = worksheet[f"{column_letter}{row_idx}"]
-                cell.alignment = alignment
+                cell.alignment = Alignment(wrap_text=True, vertical='top')
+                cell.border = full_border # 应用表格线
                 
-                # row_idx-2 是从0开始的数据行索引
-                if (row_idx - 2) % 2 == 0: # 内容行
+                # 仅将内容行加粗
+                if (row_idx - 2) % 2 == 0:
                     cell.font = content_font
-                else: # 人员行
-                    cell.font = personnel_font
-                    cell.border = thin_border # 在人员行下方添加分割线
     
     output.seek(0)
     log_activity('导出Excel', f"导出了 {start_of_week} 到 {end_of_week} 的工作计划。")
