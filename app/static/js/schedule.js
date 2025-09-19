@@ -1,21 +1,12 @@
-/**
- * 全局 Toast (浮动提示) 显示函数
- * @param {string} message - 要显示的消息内容
- * @param {string} type - 消息类型 ('info', 'success', 'danger', 'warning')
- */
 function showToast(message, type = 'info') {
     const toastElement = document.getElementById('appToast');
     if (!toastElement) return;
-
     const toastBody = toastElement.querySelector('.toast-body');
     const closeButton = toastElement.querySelector('.btn-close');
     const toast = new bootstrap.Toast(toastElement);
-
     toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary');
-    
     toastElement.classList.add('text-bg-secondary');
     closeButton.classList.add('btn-close-white');
-
     toastBody.textContent = message;
     toast.show();
 }
@@ -58,7 +49,10 @@ document.addEventListener('DOMContentLoaded', function () {
             
             renderPersonnelList(listContainer, '');
 
-            searchInput.addEventListener('input', () => renderPersonnelList(listContainer, searchInput.value));
+            searchInput.addEventListener('input', () => {
+                console.log("Search input changed:", searchInput.value); // 诊断日志
+                renderPersonnelList(listContainer, searchInput.value)
+            });
             searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -99,11 +93,12 @@ document.addEventListener('DOMContentLoaded', function () {
         filteredList.forEach(name => {
             const isChecked = currentSelectedPersonnel.has(name);
             const li = document.createElement('li');
-            li.className = 'list-group-item border-0 p-1';
+            li.className = 'list-group-item border-0 p-1 d-flex align-items-center';
             const uniqueId = `personnel-check-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
+            // --- 【修改】移除了 label 上的 w-100 类 ---
             li.innerHTML = `
                 <input class="form-check-input me-2" type="checkbox" value="${name}" id="${uniqueId}" ${isChecked ? 'checked' : ''}>
-                <label class="form-check-label w-100" for="${uniqueId}">${name}</label>
+                <label class="form-check-label" for="${uniqueId}">${name}</label>
             `;
             listContainer.appendChild(li);
         });
@@ -200,7 +195,6 @@ document.addEventListener('DOMContentLoaded', function () {
             taskModalLabel.textContent = '添加新任务';
             formAction.value = 'add';
             taskForm.reset();
-            formTaskId.value = '';
             currentSelectedPersonnel.clear();
             updatePersonnelDisplay();
             const date = addBtn.dataset.date;
