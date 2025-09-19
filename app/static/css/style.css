@@ -80,12 +80,10 @@ body {
 }
 
 .personnel-tag {
-    /* --- 【修改】改为 flex 布局 --- */
     display: inline-flex;
     align-items: center;
-    /* -------------------------- */
     padding: .25em .4em .25em .6em;
-    font-size: 85%; /* 稍微增大字体 */
+    font-size: 85%;
     font-weight: 500;
     line-height: 1;
     text-align: center;
@@ -96,12 +94,11 @@ body {
     color: #495057;
     margin-right: 5px;
     margin-bottom: 5px;
-    max-width: 150px; /* 适当增加最大宽度 */
+    max-width: 150px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 
-/* --- 【新增】标签上的关闭按钮样式 --- */
 .remove-display-tag-btn {
     background: none;
     border: none;
@@ -118,7 +115,6 @@ body {
     opacity: 1;
     color: #000;
 }
-/* ---------------------------------- */
 
 
 .blue-background-class {
@@ -142,10 +138,6 @@ body {
     align-items: center;
 }
 
-.personnel-selector-popover {
-    /* No fixed width */
-}
-
 .personnel-list-wrapper {
     max-height: 200px;
     overflow-y: auto;
@@ -166,37 +158,4 @@ body {
 .list-group-flush .list-group-item {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
-}
-
-.selected-personnel-popover {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    padding-bottom: 0.75rem;
-    border-bottom: 1px solid #dee2e6;
-}
-
-.selected-tag-item {
-    display: inline-flex;
-    align-items: center;
-    background-color: #0d6efd;
-    color: white;
-    padding: 3px 8px;
-    border-radius: 5px;
-    font-size: 0.85em;
-}
-
-.remove-tag-btn {
-    background: none;
-    border: none;
-    color: white;
-    margin-left: 6px;
-    padding: 0;
-    opacity: 0.7;
-    cursor: pointer;
-    font-size: 1.2em;
-    line-height: 1;
-}
-.remove-tag-btn:hover {
-    opacity: 1;
 }

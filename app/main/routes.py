@@ -257,7 +257,6 @@ def export_excel():
     for task in tasks:
         if task.task_date in schedule_by_day:
             personnel_str = ", ".join([a.personnel_name for a in task.assignments])
-            # --- 【修改】为每个任务添加两行：一行内容，一行人员 ---
             schedule_by_day[task.task_date].append(task.content)
             schedule_by_day[task.task_date].append(personnel_str)
 
@@ -281,23 +280,20 @@ def export_excel():
         # --- 【修改】定义样式 ---
         header_font = Font(bold=True)
         content_font = Font(bold=True)
-        # 人员使用默认字体
         
-        # 定义通用边框样式
         thin_side = Side(style='thin', color="BFBFBF")
         full_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
+        alignment = Alignment(wrap_text=True, vertical='top')
 
         for col_idx, col in enumerate(df.columns, 1):
             column_letter = get_column_letter(col_idx)
             worksheet.column_dimensions[column_letter].width = 40
             
-            # 设置表头样式
             worksheet[f"{column_letter}1"].font = header_font
             
-            # 遍历单元格设置样式
             for row_idx in range(2, max_rows + 2):
                 cell = worksheet[f"{column_letter}{row_idx}"]
-                cell.alignment = Alignment(wrap_text=True, vertical='top')
+                cell.alignment = alignment
                 cell.border = full_border # 应用表格线
                 
                 # 仅将内容行加粗
