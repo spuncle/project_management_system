@@ -7,15 +7,15 @@ from flask_login import login_required, current_user
 from datetime import date, timedelta, datetime
 from sqlalchemy import and_, func, case
 import openpyxl
+import json
 
 from . import main_bp
 from app import db
-from app.models import WorkSchedule, ActivityLog, Personnel
+from app.models import WorkSchedule, ActivityLog, Personnel, TaskAssignment
 from app.utils import log_activity
 from app.decorators import permission_required, admin_required
 
 def get_week_dates(start_date_str=None):
-    """获取指定日期所在周的周一到周日日期列表。"""
     if start_date_str:
         try:
             base_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
@@ -75,9 +75,15 @@ def add_task():
     start_date_str = request.form.get('start_date')
     end_date_str = request.form.get('end_date') or start_date_str
     content = request.form.get('content')
-    personnel = request.form.get('personnel')
+    personnel_json_str = request.form.get('personnel', '[]')
 
-    if not all([start_date_str, content, personnel]):
+    try:
+        personnel_list = json.loads(personnel_json_str)
+        personnel_names = [item['value'] for item in personnel_list if item.get('value')]
+    except (json.JSONDecodeError, TypeError):
+        personnel_names = []
+
+    if not all([start_date_str, content, personnel_names]):
         flash('开始日期、工作内容和人员均为必填项。', 'danger')
         return redirect(url_for('main.index'))
 
@@ -94,10 +100,12 @@ def add_task():
         new_task = WorkSchedule(
             task_date=current_date,
             content=content,
-            personnel=personnel,
             author_id=current_user.id,
             position=max_pos + 1
         )
+        for name in personnel_names:
+            assignment = TaskAssignment(personnel_name=name)
+            new_task.assignments.append(assignment)
         db.session.add(new_task)
         current_date += timedelta(days=1)
     
@@ -111,11 +119,12 @@ def add_task():
 @login_required
 def get_task_details(task_id):
     task = WorkSchedule.query.get_or_404(task_id)
+    personnel_list = [a.personnel_name for a in task.assignments]
     return jsonify({
         'id': task.id,
         'task_date': task.task_date.strftime('%Y-%m-%d'),
         'content': task.content,
-        'personnel': task.personnel,
+        'personnel': personnel_list,
         'version': task.version
     })
 
@@ -131,19 +140,24 @@ def update_task(task_id):
 
     client_version = data.get('version')
     if client_version is not None and task.version != client_version:
+        current_personnel_list = [a.personnel_name for a in task.assignments]
         return jsonify({
-            'success': False, 
-            'error': '此任务已被他人修改，请解决冲突。',
-            'conflict': True,
+            'success': False, 'error': '此任务已被他人修改，请解决冲突。','conflict': True,
             'current_data': {
                 'content': task.content,
-                'personnel': task.personnel,
+                'personnel': current_personnel_list,
                 'version': task.version
             }
         }), 409
 
     task.content = data.get('content', task.content)
-    task.personnel = data.get('personnel', task.personnel)
+    
+    personnel_data = data.get('personnel', None)
+    if personnel_data is not None and isinstance(personnel_data, list):
+        task.assignments.clear()
+        personnel_names = [item['value'] for item in personnel_data if isinstance(item, dict) and item.get('value')]
+        for name in personnel_names:
+            task.assignments.append(TaskAssignment(personnel_name=name))
     
     new_date_str = data.get('task_date')
     if new_date_str:
@@ -212,17 +226,15 @@ def reorder_tasks():
         log_activity('拖拽任务失败', f"任务ID {moved_task_id} 移动失败: {str(e)}")
         return jsonify({'success': False, 'error': '数据库操作失败。'}), 500
 
-@main_bp.route('/delete_task/<int:task_id>', methods=['POST'])
+@main_bp.route('/api/delete_task/<int:task_id>', methods=['POST'])
 @login_required
 @permission_required('can_delete')
-def delete_task(task_id):
+def api_delete_task(task_id):
     task = WorkSchedule.query.get_or_404(task_id)
-    start_date = task.task_date - timedelta(days=task.task_date.weekday())
     log_activity('删除任务', f"删除任务ID {task_id}, 内容: '{task.content}'")
     db.session.delete(task)
     db.session.commit()
-    flash('任务已删除。', 'success')
-    return redirect(url_for('main.index', start_date=start_date.strftime('%Y-%m-%d')))
+    return jsonify({'success': True, 'message': '任务已删除。'})
 
 @main_bp.route('/export_excel', methods=['POST'])
 @login_required
@@ -243,7 +255,8 @@ def export_excel():
     schedule_by_day = {day: [] for day in week_dates}
     for task in tasks:
         if task.task_date in schedule_by_day:
-            schedule_by_day[task.task_date].append(f"{task.content} ({task.personnel})")
+            personnel_str = ", ".join([a.personnel_name for a in task.assignments])
+            schedule_by_day[task.task_date].append(f"{task.content} ({personnel_str})")
 
     max_rows = 0
     if schedule_by_day:

@@ -17,6 +17,16 @@ document.addEventListener('DOMContentLoaded', function () {
     const formStartDate = document.getElementById('taskFormStartDate');
     const formEndDate = document.getElementById('taskFormEndDate');
 
+    const personnelInput = document.getElementById('taskFormPersonnel');
+    const tagify = new Tagify(personnelInput, {
+        whitelist: typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [],
+        dropdown: {
+            maxItems: 20,
+            enabled: 0,
+            closeOnSelect: false
+        }
+    });
+
     if (typeof USER_CAN_EDIT !== 'undefined' && USER_CAN_EDIT) {
         document.querySelectorAll('.task-list-container').forEach(container => {
             new Sortable(container, {
@@ -90,6 +100,7 @@ document.addEventListener('DOMContentLoaded', function () {
             taskModalLabel.textContent = '添加新任务';
             formAction.value = 'add';
             taskForm.reset();
+            tagify.removeAllTags();
             formTaskId.value = '';
             const date = addBtn.dataset.date;
             formStartDate.value = date;
@@ -102,6 +113,7 @@ document.addEventListener('DOMContentLoaded', function () {
             taskModalLabel.textContent = '编辑任务';
             formAction.value = 'edit';
             taskForm.reset();
+            tagify.removeAllTags();
             const taskId = editBtn.dataset.taskId;
             try {
                 const response = await fetch(`/api/get_task/${taskId}`);
@@ -109,7 +121,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const task = await response.json();
                     formTaskId.value = task.id;
                     formContent.value = task.content;
-                    formPersonnel.value = task.personnel;
+                    tagify.addTags(task.personnel);
                     formStartDate.value = task.task_date;
                     formVersion.value = task.version;
                     formEndDate.parentElement.parentElement.style.display = 'none';
@@ -166,7 +178,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const taskId = formTaskId.value;
                 const data = {
                     content: formContent.value,
-                    personnel: formPersonnel.value,
+                    personnel: tagify.value,
                     task_date: formStartDate.value,
                     version: parseInt(formVersion.value)
                 };
@@ -183,7 +195,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const errorData = await response.json();
                 handleConflict(errorData.current_data, {
                     content: formContent.value,
-                    personnel: formPersonnel.value,
+                    personnel: tagify.value.map(tag => tag.value),
                 });
             } else {
                 const errorData = await response.json().catch(() => ({ error: '服务器返回了一个未知错误。' }));
@@ -197,8 +209,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handleConflict(currentData, yourData) {
         taskModal.hide();
-        document.getElementById('conflictCurrentContent').textContent = `内容: ${currentData.content}\n人员: ${currentData.personnel}`;
-        document.getElementById('conflictYourContent').textContent = `内容: ${yourData.content}\n人员: ${yourData.personnel}`;
+        const currentPersonnelStr = Array.isArray(currentData.personnel) ? currentData.personnel.join(', ') : currentData.personnel;
+        const yourPersonnelStr = Array.isArray(yourData.personnel) ? yourData.personnel.join(', ') : yourData.personnel;
+
+        document.getElementById('conflictCurrentContent').textContent = `内容: ${currentData.content}\n人员: ${currentPersonnelStr}`;
+        document.getElementById('conflictYourContent').textContent = `内容: ${yourData.content}\n人员: ${yourPersonnelStr}`;
         conflictModal.show();
 
         const overwriteBtn = document.getElementById('conflictOverwriteBtn');
@@ -208,10 +223,10 @@ document.addEventListener('DOMContentLoaded', function () {
         newOverwriteBtn.addEventListener('click', async () => {
             const taskId = formTaskId.value;
             const data = {
-                content: yourData.content,
-                personnel: yourData.personnel,
+                content: formContent.value, // Resubmit with the original form's content
+                personnel: tagify.value,
                 task_date: formStartDate.value,
-                version: currentData.version
+                version: currentData.version // Use the NEW version from the server
             };
 
             const response = await fetch(`/api/update_task/${taskId}`, {

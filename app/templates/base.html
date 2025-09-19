@@ -7,6 +7,8 @@
     <title>{{ title or '项目管理系统' }}</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.css') }}">
+    
+    <link href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -73,8 +75,7 @@
                         </div>
                         <div class="mb-3">
                             <label for="taskFormPersonnel" class="form-label">人员</label>
-                            <input type="text" name="personnel" id="taskFormPersonnel" class="form-control" list="personnel-options" required>
-                            <small class="form-text text-muted">单人可直接输入/选择，多人请用英文逗号“,”分隔。</small>
+                            <input type="text" name="personnel" id="taskFormPersonnel" class="form-control" required>
                         </div>
                         <div class="row">
                             <div class="col">
@@ -126,6 +127,9 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.polyfills.min.js"></script>
     <script src="{{ url_for('static', filename='js/schedule.js') }}"></script>
     {% block scripts %}{% endblock %}
 </body>
