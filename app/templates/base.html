@@ -1,91 +1,131 @@
-{% extends "base.html" %}
-
-{% block content %}
-<datalist id="personnel-options">
-    {% for person in personnel_list %}
-        <option value="{{ person.name }}">
-    {% endfor %}
-</datalalist>
-
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
-    <h3 class="mb-2 mb-md-0">
-        {{ page_main_title }} 
-        <small class="text-muted fw-normal fs-6">{{ page_date_range }}</small>
-    </h3>
-    <div class="d-flex align-items-center flex-wrap">
-        <div class="btn-group me-2 mb-2 mb-md-0" role="group">
-            <a href="{{ url_for('main.index', start_date=prev_week) }}" class="btn btn-outline-secondary">&laquo; 上一周</a>
-            <a href="{{ url_for('main.index') }}" class="btn btn-outline-secondary {% if is_current_week %}active{% endif %}">当前周</a>
-            <a href="{{ url_for('main.index', start_date=next_week) }}" class="btn btn-outline-secondary">下一周 &raquo;</a>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
+    <title>{{ title or '项目管理系统' }}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('main.index') }}">项目管理系统</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('main.index') }}">周计划</a>
+                    </li>
+                    {% if current_user.is_admin %}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            管理
+                        </a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('admin.manage_personnel') }}">人员管理</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('admin.manage_users') }}">用户管理</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.invite') }}">邀请码管理</a></li>
+                            <li><a class="dropdown-item" href="{{ url_for('main.activity_logs') }}">操作日志</a></li>
+                        </ul>
+                    </li>
+                    {% endif %}
+                    {% endif %}
+                </ul>
+                <ul class="navbar-nav">
+                    {% if current_user.is_authenticated %}
+                        <li class="nav-item"><a class="nav-link">你好, {{ current_user.username }}</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">登出</a></li>
+                    {% else %}
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">登录</a></li>
+                        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}">注册</a></li>
+                    {% endif %}
+                </ul>
+            </div>
         </div>
-        <form action="{{ url_for('main.export_excel') }}" method="POST" class="mb-2 mb-md-0">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-            <input type="hidden" name="start_date" value="{{ week_dates[0].strftime('%Y-%m-%d') }}">
-            <button type="submit" class="btn btn-success"><i class="bi bi-file-earmark-excel"></i> 导出 Excel</button>
-        </form>
-    </div>
-</div>
+    </nav>
 
-<div class="table-responsive">
-    <table class="table table-bordered">
-        <thead class="table-light">
-            <tr>
-                {% for day in week_dates %}
-                    <th class="text-center" style="width: 14.28%;">
-                        星期{{ ['一', '二', '三', '四', '五', '六', '日'][day.weekday()] }}<br>
-                        <small>{{ day.strftime('%Y-%m-%d') }}</small>
-                    </th>
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            <tr>
-            {% for day in week_dates %}
-                <td class="align-top" style="min-width: 180px; vertical-align: top!important;">
-                    <div class="task-list-container" data-date="{{ day.strftime('%Y-%m-%d') }}" id="task-list-{{ day.strftime('%Y%m%d') }}">
-                        {% for task in schedule_by_day[day] %}
-                        <div class="task-card" data-task-id="{{ task.id }}" data-task-version="{{ task.version }}">
-                            <div class="task-content">{{ task.content }}</div>
-                            <div class="task-footer">
-                                <small class="text-muted"><i class="bi bi-person"></i> {{ task.personnel }}</small>
-                                {% if current_user.is_admin or current_user.can_edit or current_user.can_delete %}
-                                <div class="task-controls">
-                                    {% if current_user.is_admin or current_user.can_edit %}
-                                    <button class="btn btn-sm btn-light py-0 px-1 edit-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-task-id="{{ task.id }}"><i class="bi bi-pencil-fill"></i></button>
-                                    {% endif %}
-                                    {% if current_user.is_admin or current_user.can_delete %}
-                                    {# --- 【修改】移除了 onsubmit 确认框 --- #}
-                                    <form action="{{ url_for('main.delete_task', task_id=task.id) }}" method="POST" class="d-inline">
-                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
-                                        <button type="submit" class="btn btn-sm btn-light py-0 px-1"><i class="bi bi-trash-fill"></i></button>
-                                    </form>
-                                    {% endif %}
-                                </div>
-                                {% endif %}
+    <main class="container">
+        {% include '_flash_messages.html' %}
+        {% block content %}{}{% endblock %}
+    </main>
+    
+    <div class="modal fade" id="taskModal" tabindex="-1" aria-labelledby="taskModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="taskForm">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="taskModalLabel">任务</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <input type="hidden" id="taskFormTaskId">
+                        <input type="hidden" name="form_action" id="taskFormAction">
+                        <input type="hidden" id="taskFormVersion">
+                        <div class="mb-3">
+                            <label for="taskFormContent" class="form-label">工作内容</label>
+                            <textarea name="content" id="taskFormContent" class="form-control" rows="3" required></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label for="taskFormPersonnel" class="form-label">人员</label>
+                            <input type="text" name="personnel" id="taskFormPersonnel" class="form-control" list="personnel-options" required>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <label for="taskFormStartDate" class="form-label">开始日期</label>
+                                <input type="date" name="start_date" id="taskFormStartDate" class="form-control" required>
+                            </div>
+                            <div class="col">
+                                <label for="taskFormEndDate" class="form-label">结束日期 (可选)</label>
+                                <input type="date" name="end_date" id="taskFormEndDate" class="form-control">
                             </div>
                         </div>
-                        {% endfor %}
-                        
-                        {% if not schedule_by_day[day] %}
-                            <p class="empty-day-placeholder">(空)</p>
-                        {% endif %}
                     </div>
-                    
-                    {% if current_user.is_admin or current_user.can_add %}
-                    <div class="text-center mt-2">
-                        <button class="btn btn-sm btn-light w-100 add-task-btn" data-bs-toggle="modal" data-bs-target="#taskModal" data-date="{{ day.strftime('%Y-%m-%d') }}">
-                            <i class="bi bi-plus"></i>
-                        </button>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                        <button type="submit" class="btn btn-primary">保存</button>
                     </div>
-                    {% endif %}
-                </td>
-            {% endfor %}
-            </tr>
-        </tbody>
-    </table>
-</div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="conflictResolutionModal" tabindex="-1" aria-labelledby="conflictResolutionModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="conflictResolutionModalLabel"><i class="bi bi-exclamation-triangle-fill text-warning"></i> 保存冲突</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p>在您编辑期间，该任务已被他人修改。请检查差异并选择您的操作。</p>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h6>数据库中的当前版本</h6>
+                            <div class="p-2 bg-light rounded border" id="conflictCurrentContent" style="white-space: pre-wrap; min-height: 100px;"></div>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>您试图保存的版本</h6>
+                            <div class="p-2 bg-white rounded border" id="conflictYourContent" style="white-space: pre-wrap; min-height: 100px;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" id="conflictDiscardBtn" data-bs-dismiss="modal">放弃我的修改</button>
+                    <button type="button" class="btn btn-primary" id="conflictOverwriteBtn">强制覆盖</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<script>
-    const USER_CAN_EDIT = {{ 'true' if current_user.is_admin or current_user.can_edit else 'false' }};
-</script>
-{% endblock %}
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
+    <script src="{{ url_for('static', filename='js/schedule.js') }}"></script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
