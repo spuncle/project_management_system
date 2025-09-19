@@ -2,7 +2,6 @@ body {
     background-color: #f8f9fa;
 }
 
-/* --- 【修改】固定表格布局 --- */
 .table-bordered {
     table-layout: fixed;
     width: 100%;
@@ -10,10 +9,9 @@ body {
 
 .table th, .table td {
     vertical-align: middle;
-    word-wrap: break-word; /* 强制长内容换行 */
+    word-wrap: break-word;
 }
 
-/* 任务卡片样式 */
 .task-card {
     border: 1px solid #dee2e6;
     border-radius: .3rem;
@@ -34,18 +32,52 @@ body {
     word-wrap: break-word;
 }
 
+/* --- 【修改】重写 task-footer 样式以支持图层覆盖 --- */
 .task-footer {
+    position: relative; /* 设为相对定位，作为子元素的定位基准 */
+    min-height: 28px;
     display: flex;
-    justify-content: space-between;
-    align-items: flex-end; /* 底部对齐 */
-    font-size: 0.8rem;
-    flex-wrap: wrap; /* 换行 */
+    align-items: center;
 }
 
-/* --- 【新增】人员标签样式 --- */
+.personnel-display, .task-controls-hover {
+    position: absolute; /* 两个子元素都绝对定位，会重叠在一起 */
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    transition: opacity 0.2s ease-in-out; /* 添加平滑过渡效果 */
+}
+
+.personnel-display {
+    opacity: 1; /* 人员列表默认可见 */
+}
+
+.task-controls-hover {
+    opacity: 0; /* 操作按钮默认透明 */
+    justify-content: flex-end; /* 按钮靠右对齐 */
+}
+
+.task-card:hover .personnel-display {
+    opacity: 0; /* 鼠标悬浮在卡片上时，人员列表变透明 */
+}
+
+.task-card:hover .task-controls-hover {
+    opacity: 1; /* 鼠标悬浮在卡片上时，操作按钮变得可见 */
+}
+/* ----------------------------------------------- */
+
+
 .personnel-tags {
     margin-top: 5px;
+    /* 允许标签换行 */
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
 }
+
 .personnel-tag {
     display: inline-block;
     padding: .25em .6em;
@@ -62,26 +94,11 @@ body {
     margin-bottom: 5px;
 }
 
-
-.task-controls {
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-    flex-shrink: 0; /* 防止被挤压 */
-    margin-left: auto; /* 推到最右侧 */
-    padding-left: 10px;
-}
-
-.task-card:hover .task-controls {
-    opacity: 1;
-}
-
-/* 拖拽占位符样式 */
 .blue-background-class {
     background-color: #e0e7ff;
     border: 1px dashed #6366f1;
 }
 
-/* “(空)”占位符样式 */
 .empty-day-placeholder {
     font-size: 0.85rem;
     color: #adb5bd;

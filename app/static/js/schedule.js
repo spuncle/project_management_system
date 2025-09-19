@@ -1,21 +1,19 @@
-// --- 【新增】全局 Toast 显示函数 ---
+// --- 【修改】Toast 函数，统一使用灰色系 ---
 function showToast(message, type = 'info') {
     const toastElement = document.getElementById('appToast');
     if (!toastElement) return;
 
     const toastBody = toastElement.querySelector('.toast-body');
+    const closeButton = toastElement.querySelector('.btn-close');
     const toast = new bootstrap.Toast(toastElement);
 
     // 移除所有可能的颜色类
-    toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning');
+    toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary');
     
-    // 根据类型添加颜色
-    let toastClass = 'text-bg-info'; // 默认
-    if (type === 'success') toastClass = 'text-bg-success';
-    if (type === 'danger' || type === 'error') toastClass = 'text-bg-danger';
-    if (type === 'warning') toastClass = 'text-bg-warning';
+    // 统一设置为灰色系，并确保关闭按钮可见
+    toastElement.classList.add('text-bg-secondary'); // Bootstrap 的标准灰色
+    closeButton.classList.add('btn-close-white'); // 在深色背景上使用白色关闭按钮
 
-    toastElement.classList.add(toastClass);
     toastBody.textContent = message;
     toast.show();
 }
@@ -60,6 +58,7 @@ document.addEventListener('DOMContentLoaded', function () {
                     const movedTaskElement = evt.item;
                     const fromContainer = evt.from;
                     const toContainer = evt.to;
+                    
                     const payload = {
                         moved_task: {
                             id: parseInt(movedTaskElement.dataset.taskId),
@@ -70,18 +69,21 @@ document.addEventListener('DOMContentLoaded', function () {
                             task_ids: Array.from(toContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
                         }
                     };
+
                     if (fromContainer !== toContainer) {
                         payload.source_list = {
                             date: fromContainer.dataset.date,
                             task_ids: Array.from(fromContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
                         };
                     }
+                    
                     try {
                         const response = await fetch('/api/reorder_tasks', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify(payload)
                         });
+
                         if (!response.ok) {
                             const errorData = await response.json();
                             showToast(errorData.error || "操作失败，页面将刷新以同步最新状态。", 'danger');
@@ -131,7 +133,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (editBtn) {
-            event.preventDefault(); // 阻止 <a> 标签的默认跳转行为
+            event.preventDefault();
             taskModalLabel.textContent = '编辑任务';
             formAction.value = 'edit';
             taskForm.reset();
@@ -214,7 +216,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (response.ok) {
-                // 成功后由后端 flash 消息来提示，这里直接刷新
                 location.reload();
             } else if (response.status === 409) {
                 const errorData = await response.json();
