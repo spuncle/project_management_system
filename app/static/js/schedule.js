@@ -3,7 +3,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const taskModalElement = document.getElementById('taskModal');
     const conflictModalElement = document.getElementById('conflictResolutionModal');
     if (!taskModalElement || !conflictModalElement) {
-        console.error("关键的模态框HTML元素未找到，脚本无法执行。");
         return;
     }
     const taskModal = new bootstrap.Modal(taskModalElement);
@@ -24,22 +23,45 @@ document.addEventListener('DOMContentLoaded', function () {
                 animation: 150,
                 group: 'shared',
                 ghostClass: 'blue-background-class',
-                onEnd: function (evt) {
-                    const taskId = evt.item.dataset.taskId;
-                    const taskVersion = evt.item.dataset.taskVersion;
+                onEnd: async function (evt) {
+                    const movedTaskElement = evt.item;
+                    const fromContainer = evt.from;
+                    const toContainer = evt.to;
                     
-                    if (evt.from !== evt.to) {
-                        const newDate = evt.to.dataset.date;
-                        updateTaskDate(taskId, newDate, taskVersion);
+                    const payload = {
+                        moved_task: {
+                            id: parseInt(movedTaskElement.dataset.taskId),
+                            version: parseInt(movedTaskElement.dataset.taskVersion)
+                        },
+                        target_list: {
+                            date: toContainer.dataset.date,
+                            task_ids: Array.from(toContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
+                        }
+                    };
+
+                    if (fromContainer !== toContainer) {
+                        payload.source_list = {
+                            date: fromContainer.dataset.date,
+                            task_ids: Array.from(fromContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
+                        };
                     }
                     
-                    updateOrder(evt.from);
-                    if (evt.from !== evt.to) {
-                        updateOrder(evt.to);
+                    try {
+                        const response = await fetch('/api/reorder_tasks', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) {
+                            const errorData = await response.json();
+                            alert(errorData.error || "操作失败，页面将刷新以同步最新状态。");
+                        }
+                    } catch (error) {
+                        alert("网络错误，操作失败。页面将刷新。");
+                    } finally {
+                        location.reload();
                     }
-                    
-                    checkAndToggleEmptyPlaceholder(evt.from);
-                    checkAndToggleEmptyPlaceholder(evt.to);
                 }
             });
         });
@@ -56,56 +78,6 @@ document.addEventListener('DOMContentLoaded', function () {
             container.appendChild(p);
         } else if (taskCards.length > 0 && placeholder) {
             placeholder.remove();
-        }
-    }
-
-    async function updateOrder(container) {
-        const tasks = Array.from(container.querySelectorAll('.task-card'))
-            .map(card => ({
-                id: parseInt(card.dataset.taskId),
-                version: parseInt(card.dataset.taskVersion)
-            }));
-        
-        if (tasks.length === 0) return;
-
-        try {
-            const response = await fetch('/api/update_order', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ tasks: tasks })
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                alert(errorData.error || "顺序更新失败，页面将刷新。");
-                location.reload();
-            } else {
-                 // 成功后刷新，以获取后端生成的新版本号
-                 location.reload();
-            }
-        } catch (error) {
-            alert("网络错误，顺序更新失败。");
-            location.reload();
-        }
-    }
-
-    async function updateTaskDate(taskId, newDate, taskVersion) {
-        try {
-            const response = await fetch(`/api/update_task/${taskId}`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
-                body: JSON.stringify({ 
-                    task_date: newDate,
-                    version: parseInt(taskVersion)
-                })
-            });
-            if (!response.ok) {
-                const errorData = await response.json();
-                alert(errorData.error || "移动任务失败，页面将刷新。");
-                location.reload();
-            }
-        } catch (error) {
-            alert("网络错误，移动任务失败。");
-            location.reload();
         }
     }
 

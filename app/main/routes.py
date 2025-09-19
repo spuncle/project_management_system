@@ -15,6 +15,7 @@ from app.utils import log_activity
 from app.decorators import permission_required, admin_required
 
 def get_week_dates(start_date_str=None):
+    """获取指定日期所在周的周一到周日日期列表。"""
     if start_date_str:
         try:
             base_date = datetime.strptime(start_date_str, '%Y-%m-%d').date()
@@ -51,8 +52,7 @@ def index():
         
     prev_week_start = start_of_week - timedelta(days=7)
     next_week_start = start_of_week + timedelta(days=7)
-    
-    # --- 【修改】将标题拆分为两部分 ---
+
     page_main_title = "周工作计划"
     page_date_range = f"({start_of_week.strftime('%Y-%m-%d')} 至 {end_of_week.strftime('%Y-%m-%d')})"
 
@@ -115,7 +115,8 @@ def get_task_details(task_id):
         'id': task.id,
         'task_date': task.task_date.strftime('%Y-%m-%d'),
         'content': task.content,
-        'personnel': task.personnel
+        'personnel': task.personnel,
+        'version': task.version
     })
 
 @main_bp.route('/api/update_task/<int:task_id>', methods=['POST'])
@@ -128,11 +129,8 @@ def update_task(task_id):
     if not data:
         return jsonify({'success': False, 'error': '无效数据'}), 400
 
-    # --- 乐观锁检查 ---
     client_version = data.get('version')
-    # 检查客户端是否提交了版本号，并且是否与数据库中的版本号不匹配
     if client_version is not None and task.version != client_version:
-        # 发生冲突，返回 409 状态码，并附上数据库的当前数据
         return jsonify({
             'success': False, 
             'error': '此任务已被他人修改，请解决冲突。',
@@ -143,7 +141,6 @@ def update_task(task_id):
                 'version': task.version
             }
         }), 409
-    # --------------------
 
     task.content = data.get('content', task.content)
     task.personnel = data.get('personnel', task.personnel)
@@ -155,58 +152,65 @@ def update_task(task_id):
         except ValueError:
             return jsonify({'success': False, 'error': '无效的日期格式'}), 400
 
-    task.version += 1 # 每次更新时，版本号加一
+    task.version += 1
     db.session.commit()
     log_activity('更新任务', f"更新了任务ID {task_id}，内容: '{task.content}'")
     return jsonify({'success': True, 'message': '任务已更新。'})
 
-@main_bp.route('/api/update_order', methods=['POST'])
+@main_bp.route('/api/reorder_tasks', methods=['POST'])
 @login_required
 @permission_required('can_edit')
-def update_order():
+def reorder_tasks():
     data = request.get_json()
-    # 前端现在会传来一个对象列表，每个对象包含 id 和 version
-    tasks_from_client = data.get('tasks', [])
-    task_ids = [t['id'] for t in tasks_from_client]
-    
-    if not task_ids:
+    moved_task_data = data.get('moved_task')
+    source_list_data = data.get('source_list')
+    target_list_data = data.get('target_list')
+
+    if not moved_task_data or not target_list_data:
+        return jsonify({'success': False, 'error': '请求数据不完整。'}), 400
+
+    moved_task_id = moved_task_data['id']
+    client_version = moved_task_data['version']
+
+    moved_task_db = WorkSchedule.query.get(moved_task_id)
+    if not moved_task_db or moved_task_db.version != client_version:
+        return jsonify({
+            'success': False,
+            'error': '操作失败，任务已被他人修改。请刷新页面后重试。',
+            'conflict': True
+        }), 409
+
+    try:
+        new_date_str = target_list_data.get('date')
+        new_date = datetime.strptime(new_date_str, '%Y-%m-%d').date()
+        if moved_task_db.task_date != new_date:
+            moved_task_db.task_date = new_date
+
+        target_ids = target_list_data.get('task_ids', [])
+        if target_ids:
+            target_case = case({int(tid): i for i, tid in enumerate(target_ids)}, value=WorkSchedule.id)
+            db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(target_ids)).update(
+                {'position': target_case, 'version': WorkSchedule.version + 1},
+                synchronize_session=False
+            )
+        
+        if source_list_data:
+            source_ids = source_list_data.get('task_ids', [])
+            if source_ids:
+                source_case = case({int(tid): i for i, tid in enumerate(source_ids)}, value=WorkSchedule.id)
+                db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(source_ids)).update(
+                    {'position': source_case, 'version': WorkSchedule.version + 1},
+                    synchronize_session=False
+                )
+        
+        db.session.commit()
+        log_activity('拖拽任务', f"移动了任务ID {moved_task_id}")
         return jsonify({'success': True})
 
-    # --- 【修改】乐观锁前置检查 ---
-    # 1. 从数据库中一次性获取所有相关任务的当前版本
-    tasks_from_db = WorkSchedule.query.filter(WorkSchedule.id.in_(task_ids)).all()
-    db_versions = {t.id: t.version for t in tasks_from_db}
-
-    # 2. 检查客户端提交的版本号是否与数据库中的一致
-    for task_client in tasks_from_client:
-        task_id = task_client['id']
-        client_version = task_client['version']
-        if task_id not in db_versions or db_versions[task_id] != client_version:
-            # 只要有一个任务版本不匹配，就拒绝整个操作
-            return jsonify({
-                'success': False,
-                'error': '操作失败，因为任务列表已被他人修改。请刷新页面后重试。',
-                'conflict': True
-            }), 409 # 返回 409 Conflict
-
-    # --------------------------
-
-    # 3. 版本检查通过，执行批量更新
-    case_statement = case(
-        {task['id']: index for index, task in enumerate(tasks_from_client)},
-        value=WorkSchedule.id
-    )
-    # 每次顺序更新，也增加版本号
-    db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(task_ids)).update(
-        {'position': case_statement, 'version': WorkSchedule.version + 1}, 
-        synchronize_session=False
-    )
-    db.session.commit()
-    
-    # 日志记录可以简化，因为细节可能太多
-    log_activity('调整任务顺序', f"更新了 {len(task_ids)} 个任务的顺序")
-    
-    return jsonify({'success': True})
+    except Exception as e:
+        db.session.rollback()
+        log_activity('拖拽任务失败', f"任务ID {moved_task_id} 移动失败: {str(e)}")
+        return jsonify({'success': False, 'error': '数据库操作失败。'}), 500
 
 @main_bp.route('/delete_task/<int:task_id>', methods=['POST'])
 @login_required
@@ -236,11 +240,9 @@ def export_excel():
         flash('该周没有可导出的数据。', 'warning')
         return redirect(url_for('main.index', start_date=start_date_str))
 
-    # 按页面格式重塑数据
     schedule_by_day = {day: [] for day in week_dates}
     for task in tasks:
         if task.task_date in schedule_by_day:
-            # 格式化每条任务的显示内容
             schedule_by_day[task.task_date].append(f"{task.content} ({task.personnel})")
 
     max_rows = 0
@@ -251,7 +253,6 @@ def export_excel():
     for day in week_dates:
         day_str = day.strftime('%Y-%m-%d') + " (星期" + ['一','二','三','四','五','六','日'][day.weekday()] + ")"
         tasks_for_day = schedule_by_day[day]
-        # 使用空字符串补全列表，使其长度一致
         data_dict[day_str] = tasks_for_day + [''] * (max_rows - len(tasks_for_day))
 
     df = pd.DataFrame(data_dict)
@@ -260,10 +261,16 @@ def export_excel():
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='周工作计划')
         worksheet = writer.sheets['周工作计划']
-        # 自动调整列宽和文本换行
+        
+        header_font = openpyxl.styles.Font(bold=True)
+        header_fill = openpyxl.styles.PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+        
         for i, col in enumerate(df.columns, 1):
             column_letter = get_column_letter(i)
-            worksheet.column_dimensions[column_letter].width = 40 # 设置一个较大的默认宽度
+            worksheet.column_dimensions[column_letter].width = 40
+            header_cell = worksheet[f"{column_letter}1"]
+            header_cell.font = header_font
+            header_cell.fill = header_fill
             for cell in worksheet[column_letter]:
                 cell.alignment = openpyxl.styles.Alignment(wrap_text=True, vertical='top')
     
