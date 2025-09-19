@@ -1,3 +1,26 @@
+// --- 【新增】全局 Toast 显示函数 ---
+function showToast(message, type = 'info') {
+    const toastElement = document.getElementById('appToast');
+    if (!toastElement) return;
+
+    const toastBody = toastElement.querySelector('.toast-body');
+    const toast = new bootstrap.Toast(toastElement);
+
+    // 移除所有可能的颜色类
+    toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning');
+    
+    // 根据类型添加颜色
+    let toastClass = 'text-bg-info'; // 默认
+    if (type === 'success') toastClass = 'text-bg-success';
+    if (type === 'danger' || type === 'error') toastClass = 'text-bg-danger';
+    if (type === 'warning') toastClass = 'text-bg-warning';
+
+    toastElement.classList.add(toastClass);
+    toastBody.textContent = message;
+    toast.show();
+}
+
+
 document.addEventListener('DOMContentLoaded', function () {
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const taskModalElement = document.getElementById('taskModal');
@@ -20,11 +43,10 @@ document.addEventListener('DOMContentLoaded', function () {
     const personnelInput = document.getElementById('taskFormPersonnel');
     const tagify = new Tagify(personnelInput, {
         whitelist: typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [],
-        // --- 【修改】优化下拉列表设置 ---
         dropdown: {
-            maxItems: 20,           // 最多显示20个建议
-            enabled: 0,             // 获得焦点时立即显示建议列表
-            closeOnSelect: false    // 选择后不关闭，方便多选
+            maxItems: 20,
+            enabled: 0,
+            closeOnSelect: false
         }
     });
 
@@ -38,7 +60,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     const movedTaskElement = evt.item;
                     const fromContainer = evt.from;
                     const toContainer = evt.to;
-                    
                     const payload = {
                         moved_task: {
                             id: parseInt(movedTaskElement.dataset.taskId),
@@ -49,29 +70,28 @@ document.addEventListener('DOMContentLoaded', function () {
                             task_ids: Array.from(toContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
                         }
                     };
-
                     if (fromContainer !== toContainer) {
                         payload.source_list = {
                             date: fromContainer.dataset.date,
                             task_ids: Array.from(fromContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
                         };
                     }
-                    
                     try {
                         const response = await fetch('/api/reorder_tasks', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                             body: JSON.stringify(payload)
                         });
-
                         if (!response.ok) {
                             const errorData = await response.json();
-                            alert(errorData.error || "操作失败，页面将刷新以同步最新状态。");
+                            showToast(errorData.error || "操作失败，页面将刷新以同步最新状态。", 'danger');
+                            setTimeout(() => location.reload(), 2000);
+                        } else {
+                             location.reload();
                         }
                     } catch (error) {
-                        alert("网络错误，操作失败。页面将刷新。");
-                    } finally {
-                        location.reload();
+                        showToast("网络错误，操作失败。页面将刷新。", 'danger');
+                        setTimeout(() => location.reload(), 2000);
                     }
                 }
             });
@@ -111,6 +131,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (editBtn) {
+            event.preventDefault(); // 阻止 <a> 标签的默认跳转行为
             taskModalLabel.textContent = '编辑任务';
             formAction.value = 'edit';
             taskForm.reset();
@@ -127,16 +148,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     formVersion.value = task.version;
                     formEndDate.parentElement.parentElement.style.display = 'none';
                 } else {
-                    alert('无法加载任务详情，请刷新页面后重试。');
+                    showToast('无法加载任务详情，请刷新页面后重试。', 'danger');
                     taskModal.hide();
                 }
             } catch (error) {
                 console.error("加载任务详情失败:", error);
-                alert('网络错误，无法加载任务详情。');
+                showToast('网络错误，无法加载任务详情。', 'danger');
             }
         }
 
         if (deleteBtn) {
+            event.preventDefault();
             const taskId = deleteBtn.dataset.taskId;
             deleteTask(taskId, deleteBtn);
         }
@@ -150,15 +172,16 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             const data = await response.json();
             if (data.success) {
+                showToast(data.message || '任务已删除。', 'success');
                 const card = buttonElement.closest('.task-card');
                 const container = card.parentElement;
                 card.remove();
                 checkAndToggleEmptyPlaceholder(container);
             } else {
-                alert(data.error || '删除失败。');
+                showToast(data.error || '删除失败。', 'danger');
             }
         } catch (error) {
-            alert('网络错误，删除失败。');
+            showToast('网络错误，删除失败。', 'danger');
         }
     }
 
@@ -191,6 +214,7 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             if (response.ok) {
+                // 成功后由后端 flash 消息来提示，这里直接刷新
                 location.reload();
             } else if (response.status === 409) {
                 const errorData = await response.json();
@@ -200,11 +224,11 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
             } else {
                 const errorData = await response.json().catch(() => ({ error: '服务器返回了一个未知错误。' }));
-                alert(errorData.error || `操作失败 (状态码: ${response.status})`);
+                showToast(errorData.error || `操作失败 (状态码: ${response.status})`, 'danger');
             }
         } catch (error) {
             console.error('表单提交时发生错误:', error);
-            alert('发生网络错误或无法解析服务器响应。');
+            showToast('发生网络错误或无法解析服务器响应。', 'danger');
         }
     });
 
@@ -239,7 +263,7 @@ document.addEventListener('DOMContentLoaded', function () {
             if(response.ok) {
                 location.reload();
             } else {
-                alert('覆盖失败，可能发生了新的冲突。请刷新页面。');
+                showToast('覆盖失败，可能发生了新的冲突。请刷新页面。', 'danger');
                 conflictModal.hide();
             }
         });
