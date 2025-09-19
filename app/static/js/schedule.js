@@ -21,7 +21,6 @@ function showToast(message, type = 'info') {
 }
 
 document.addEventListener('DOMContentLoaded', function () {
-    // --- 1. 变量定义与初始化 ---
     const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
     const taskModalElement = document.getElementById('taskModal');
     const conflictModalElement = document.getElementById('conflictResolutionModal');
@@ -48,51 +47,48 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentSelectedPersonnel = new Set();
     const allPersonnel = typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [];
     
-    // --- 2. 人员选择器 (Popover) 核心逻辑 ---
     const popover = new bootstrap.Popover(personnelDisplayArea, {
         html: true,
-        content: popoverContentTemplate.innerHTML,
+        content: function () {
+            const contentEl = popoverContentTemplate.cloneNode(true);
+            contentEl.classList.remove('d-none');
+
+            const searchInput = contentEl.querySelector('.personnel-search-input');
+            const listContainer = contentEl.querySelector('.personnel-list-container');
+            
+            renderPersonnelList(listContainer, '');
+
+            searchInput.addEventListener('input', () => renderPersonnelList(listContainer, searchInput.value));
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    const newName = searchInput.value.trim();
+                    if (newName) {
+                        currentSelectedPersonnel.add(newName);
+                        updatePersonnelDisplay();
+                        renderPersonnelList(listContainer, '');
+                        searchInput.value = '';
+                    }
+                }
+            });
+
+            listContainer.addEventListener('change', (e) => {
+                if (e.target.type === 'checkbox') {
+                    const name = e.target.value;
+                    if (e.target.checked) {
+                        currentSelectedPersonnel.add(name);
+                    } else {
+                        currentSelectedPersonnel.delete(name);
+                    }
+                    updatePersonnelDisplay();
+                }
+            });
+            return contentEl;
+        },
         title: '选择或添加人员',
         placement: 'bottom',
         trigger: 'click',
         customClass: 'personnel-popover'
-    });
-
-    personnelDisplayArea.addEventListener('shown.bs.popover', () => {
-        // 【关键修正】使用 popover 实例自身的 .tip 属性来安全地找到 popover 元素
-        const popoverTip = popover.tip; 
-        if (!popoverTip) return;
-
-        const searchInput = popoverTip.querySelector('.personnel-search-input');
-        const listContainer = popoverTip.querySelector('.personnel-list-container');
-        
-        renderPersonnelList(listContainer, searchInput.value);
-
-        searchInput.addEventListener('input', () => renderPersonnelList(listContainer, searchInput.value));
-        searchInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                const newName = searchInput.value.trim();
-                if (newName) {
-                    currentSelectedPersonnel.add(newName);
-                    updatePersonnelDisplay();
-                    renderPersonnelList(listContainer, '');
-                    searchInput.value = '';
-                }
-            }
-        });
-
-        listContainer.addEventListener('change', (e) => {
-            if (e.target.type === 'checkbox') {
-                const name = e.target.value;
-                if (e.target.checked) {
-                    currentSelectedPersonnel.add(name);
-                } else {
-                    currentSelectedPersonnel.delete(name);
-                }
-                updatePersonnelDisplay();
-            }
-        });
     });
 
     function renderPersonnelList(listContainer, filter = '') {
@@ -104,9 +100,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const isChecked = currentSelectedPersonnel.has(name);
             const li = document.createElement('li');
             li.className = 'list-group-item border-0 p-1';
+            const uniqueId = `personnel-check-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
             li.innerHTML = `
-                <input class="form-check-input me-2" type="checkbox" value="${name}" id="personnel-check-${name.replace(/\s+/g, '-')}" ${isChecked ? 'checked' : ''}>
-                <label class="form-check-label w-100" for="personnel-check-${name.replace(/\s+/g, '-')}">${name}</label>
+                <input class="form-check-input me-2" type="checkbox" value="${name}" id="${uniqueId}" ${isChecked ? 'checked' : ''}>
+                <label class="form-check-label w-100" for="${uniqueId}">${name}</label>
             `;
             listContainer.appendChild(li);
         });
@@ -129,7 +126,6 @@ document.addEventListener('DOMContentLoaded', function () {
         hiddenPersonnelInput.value = JSON.stringify(personnelForBackend);
     }
     
-    // --- 3. 拖拽排序功能 ---
     if (typeof USER_CAN_EDIT !== 'undefined' && USER_CAN_EDIT) {
         document.querySelectorAll('.task-list-container').forEach(container => {
             new Sortable(container, {
@@ -181,7 +177,6 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
-    // --- 4. 其他辅助与事件监听函数 ---
     function checkAndToggleEmptyPlaceholder(container) {
         if (!container) return;
         const placeholder = container.querySelector('.empty-day-placeholder');
