@@ -7,7 +7,6 @@
     <title>{{ title or '项目管理系统' }}</title>
     <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.css') }}">
-    <link href="{{ url_for('static', filename='vendor/tagify.css') }}" rel="stylesheet" type="text/css" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -138,6 +137,8 @@
     
     <div id="personnel-popover-content-template" class="d-none">
         <div class="personnel-selector-popover">
+            <div class="selected-personnel-popover mb-2">
+            </div>
             <input type="search" class="form-control form-control-sm mb-2 personnel-search-input" placeholder="搜索或添加新人员...">
             <div class="personnel-list-wrapper">
                 <ul class="list-group list-group-flush personnel-list-container">
@@ -148,8 +149,6 @@
 
     <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/Sortable.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/tagify.min.js') }}"></script>
-    <script src="{{ url_for('static', filename='vendor/tagify.polyfills.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/schedule.js') }}"></script>
     
     <script>

@@ -20,13 +20,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!taskModalElement || !conflictModalElement || !popoverContentTemplate) {
         return;
     }
-
-    // --- 【修改】在初始化时禁用焦点陷阱 ---
-    const taskModal = new bootstrap.Modal(taskModalElement, {
-        focus: false
-    });
-    // ------------------------------------
-
+    const taskModal = new bootstrap.Modal(taskModalElement, { focus: false });
     const conflictModal = new bootstrap.Modal(conflictModalElement);
     
     const taskForm = document.getElementById('taskForm');
@@ -51,8 +45,10 @@ document.addEventListener('DOMContentLoaded', function () {
             contentEl.classList.remove('d-none');
             const searchInput = contentEl.querySelector('.personnel-search-input');
             const listContainer = contentEl.querySelector('.personnel-list-container');
+            const selectedContainer = contentEl.querySelector('.selected-personnel-popover');
             
             renderPersonnelList(listContainer, '');
+            renderSelectedTags(selectedContainer);
 
             searchInput.addEventListener('input', () => renderPersonnelList(listContainer, searchInput.value));
             searchInput.addEventListener('keydown', (e) => {
@@ -63,6 +59,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         currentSelectedPersonnel.add(newName);
                         updatePersonnelDisplay();
                         renderPersonnelList(listContainer, '');
+                        renderSelectedTags(selectedContainer);
                         searchInput.value = '';
                     }
                 }
@@ -74,6 +71,17 @@ document.addEventListener('DOMContentLoaded', function () {
                     if (e.target.checked) { currentSelectedPersonnel.add(name); } 
                     else { currentSelectedPersonnel.delete(name); }
                     updatePersonnelDisplay();
+                    renderSelectedTags(selectedContainer);
+                }
+            });
+
+            selectedContainer.addEventListener('click', (e) => {
+                if(e.target.classList.contains('remove-tag-btn')) {
+                    const name = e.target.dataset.name;
+                    currentSelectedPersonnel.delete(name);
+                    updatePersonnelDisplay();
+                    renderPersonnelList(listContainer, '');
+                    renderSelectedTags(selectedContainer);
                 }
             });
             return contentEl;
@@ -91,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function () {
             searchInput.focus();
         }
     });
-    
+
     window.addEventListener('click', function (e) {
         const popoverTip = popover.tip;
         if (popoverTip && popoverTip.classList.contains('show') && !personnelDisplayArea.contains(e.target) && !popoverTip.contains(e.target)) {
@@ -103,16 +111,24 @@ document.addEventListener('DOMContentLoaded', function () {
         listContainer.innerHTML = '';
         const lowerCaseFilter = filter.toLowerCase();
         const filteredList = allPersonnel.filter(p => p.toLowerCase().includes(lowerCaseFilter));
+
         filteredList.forEach(name => {
             const isChecked = currentSelectedPersonnel.has(name);
             const li = document.createElement('li');
             li.className = 'list-group-item border-0 p-1 d-flex align-items-center';
             const uniqueId = `personnel-check-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
-            li.innerHTML = `
-                <input class="form-check-input me-2" type="checkbox" value="${name}" id="${uniqueId}" ${isChecked ? 'checked' : ''}>
-                <label class="form-check-label" for="${uniqueId}">${name}</label>
-            `;
+            li.innerHTML = `<input class="form-check-input me-2" type="checkbox" value="${name}" id="${uniqueId}" ${isChecked ? 'checked' : ''}><label class="form-check-label" for="${uniqueId}">${name}</label>`;
             listContainer.appendChild(li);
+        });
+    }
+
+    function renderSelectedTags(container) {
+        container.innerHTML = '';
+        currentSelectedPersonnel.forEach(name => {
+            const tag = document.createElement('div');
+            tag.className = 'selected-tag-item';
+            tag.innerHTML = `<span>${name}</span><button type="button" class="remove-tag-btn" data-name="${name}">&times;</button>`;
+            container.appendChild(tag);
         });
     }
 
@@ -331,11 +347,13 @@ document.addEventListener('DOMContentLoaded', function () {
                 task_date: formStartDate.value,
                 version: currentData.version
             };
+
             const response = await fetch(`/api/update_task/${taskId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify(data)
             });
+
             if(response.ok) {
                 location.reload();
             } else {
