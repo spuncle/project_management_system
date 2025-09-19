@@ -103,8 +103,9 @@ def add_task():
             author_id=current_user.id,
             position=max_pos + 1
         )
-        for name in personnel_names:
-            assignment = TaskAssignment(personnel_name=name)
+        # --- 【修改】使用 enumerate 来记录人员顺序 ---
+        for index, name in enumerate(personnel_names):
+            assignment = TaskAssignment(personnel_name=name, position=index)
             new_task.assignments.append(assignment)
         db.session.add(new_task)
         current_date += timedelta(days=1)
@@ -156,8 +157,9 @@ def update_task(task_id):
     if personnel_data is not None and isinstance(personnel_data, list):
         task.assignments.clear()
         personnel_names = [item['value'] for item in personnel_data if isinstance(item, dict) and item.get('value')]
-        for name in personnel_names:
-            task.assignments.append(TaskAssignment(personnel_name=name))
+        # --- 【修改】使用 enumerate 来记录人员顺序 ---
+        for index, name in enumerate(personnel_names):
+            task.assignments.append(TaskAssignment(personnel_name=name, position=index))
     
     new_date_str = data.get('task_date')
     if new_date_str:
@@ -252,42 +254,43 @@ def export_excel():
         flash('该周没有可导出的数据。', 'warning')
         return redirect(url_for('main.index', start_date=start_date_str))
 
-    schedule_by_day = {day: [] for day in week_dates}
+    # --- 【修改】重写 Excel 导出为长格式 ---
+    excel_data = []
     for task in tasks:
-        if task.task_date in schedule_by_day:
-            personnel_str = ", ".join([a.personnel_name for a in task.assignments])
-            formatted_string = f"{task.content}\n({personnel_str})"
-            schedule_by_day[task.task_date].append(formatted_string)
-
-    max_rows = 0
-    if schedule_by_day:
-        max_rows = max(len(tasks) for tasks in schedule_by_day.values()) if any(schedule_by_day.values()) else 0
-
-    data_dict = {}
-    for day in week_dates:
-        day_str = day.strftime('%Y-%m-%d') + " (星期" + ['一','二','三','四','五','六','日'][day.weekday()] + ")"
-        tasks_for_day = schedule_by_day[day]
-        data_dict[day_str] = tasks_for_day + [''] * (max_rows - len(tasks_for_day))
-
-    df = pd.DataFrame(data_dict)
+        if not task.assignments:
+            # 如果某个任务意外地没有分配人员，也添加一条记录
+            excel_data.append({
+                '日期': task.task_date.strftime('%Y-%m-%d'),
+                '工作内容': task.content,
+                '人员': ''
+            })
+        else:
+            # 每个被分配的人员都单独成为一行
+            for assignment in task.assignments:
+                excel_data.append({
+                    '日期': task.task_date.strftime('%Y-%m-%d'),
+                    '工作内容': task.content,
+                    '人员': assignment.personnel_name
+                })
+    
+    df = pd.DataFrame(excel_data)
+    # ------------------------------------
 
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='周工作计划')
         worksheet = writer.sheets['周工作计划']
         
+        # 调整列宽
+        worksheet.column_dimensions[get_column_letter(1)].width = 15  # 日期
+        worksheet.column_dimensions[get_column_letter(2)].width = 60  # 工作内容
+        worksheet.column_dimensions[get_column_letter(3)].width = 20  # 人员
+
+        # 设置表头样式
         header_font = openpyxl.styles.Font(bold=True)
-        header_fill = openpyxl.styles.PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
-        
-        for i, col in enumerate(df.columns, 1):
-            column_letter = get_column_letter(i)
-            worksheet.column_dimensions[column_letter].width = 40
-            header_cell = worksheet[f"{column_letter}1"]
-            header_cell.font = header_font
-            header_cell.fill = header_fill
-            for cell in worksheet[column_letter]:
-                cell.alignment = openpyxl.styles.Alignment(wrap_text=True, vertical='top')
-    
+        for cell in worksheet["1:1"]:
+            cell.font = header_font
+            
     output.seek(0)
     log_activity('导出Excel', f"导出了 {start_of_week} 到 {end_of_week} 的工作计划。")
     response = make_response(output.read())
