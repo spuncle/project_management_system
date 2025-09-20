@@ -1,3 +1,4 @@
+import secrets
 from flask import render_template, redirect, url_for, flash, request, jsonify
 from flask_login import login_required, current_user
 from . import admin_bp
@@ -34,7 +35,6 @@ def delete_personnel(person_id):
     flash(f'人员 "{person.name}" 已被删除。', 'success')
     return redirect(url_for('admin.manage_personnel'))
 
-# --- 新增用户管理路由 ---
 @admin_bp.route('/users')
 @login_required
 @admin_required
@@ -47,10 +47,13 @@ def manage_users():
 @admin_required
 def update_user_permissions(user_id):
     user = User.query.get_or_404(user_id)
-    if user.id == current_user.id:
-        return jsonify({'success': False, 'error': '不能修改自己的权限。'}), 400
-        
     data = request.get_json()
+    
+    # 防止管理员意外修改自己的权限（除非是取消自己的管理员身份）
+    if user.id == current_user.id:
+        if not (data.get('permission') == 'is_admin' and not data.get('value')):
+            return jsonify({'success': False, 'error': '为安全起见，不能修改自己的权限。'}), 400
+        
     permission_name = data.get('permission')
     value = data.get('value')
 
@@ -61,3 +64,34 @@ def update_user_permissions(user_id):
         return jsonify({'success': True})
     
     return jsonify({'success': False, 'error': '无效的权限名称。'}), 400
+
+# --- 【新增】管理员删除用户路由 ---
+@admin_bp.route('/user/delete/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def delete_user(user_id):
+    user_to_delete = User.query.get_or_404(user_id)
+    if user_to_delete.id == current_user.id:
+        flash('不能删除自己。', 'danger')
+        return redirect(url_for('admin.manage_users'))
+    
+    username = user_to_delete.username
+    db.session.delete(user_to_delete)
+    db.session.commit()
+    log_activity('删除用户', f"管理员 {current_user.username} 删除了用户 {username}")
+    flash(f'用户 "{username}" 已被成功删除。', 'success')
+    return redirect(url_for('admin.manage_users'))
+
+# --- 【新增】管理员重置密码路由 ---
+@admin_bp.route('/user/reset-password/<int:user_id>', methods=['POST'])
+@login_required
+@admin_required
+def reset_password(user_id):
+    user_to_reset = User.query.get_or_404(user_id)
+    new_password = secrets.token_urlsafe(8) # 生成一个8位的随机密码
+    user_to_reset.set_password(new_password)
+    db.session.commit()
+    
+    log_activity('重置密码', f"管理员 {current_user.username} 重置了用户 {user_to_reset.username} 的密码")
+    flash(f'用户 "{user_to_reset.username}" 的密码已被重置。新密码是: {new_password}', 'warning')
+    return redirect(url_for('admin.manage_users'))

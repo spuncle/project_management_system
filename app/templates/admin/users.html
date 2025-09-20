@@ -12,6 +12,7 @@
                 <th>允许添加</th>
                 <th>允许编辑</th>
                 <th>允许删除</th>
+                <th>操作</th>
             </tr>
         </thead>
         <tbody>
@@ -47,11 +48,25 @@
                                {% if user.can_delete %}checked{% endif %} {% if user.is_admin %}disabled{% endif %}>
                     </div>
                 </td>
+                <td>
+                    {% if user.id != current_user.id %}
+                    <div class="btn-group btn-group-sm">
+                        <form action="{{ url_for('admin.reset_password', user_id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('您确定要重置该用户的密码吗？一个新的随机密码将会生成。');">
+                             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                             <button type="submit" class="btn btn-outline-warning">重置密码</button>
+                        </form>
+                        <form action="{{ url_for('admin.delete_user', user_id=user.id) }}" method="POST" class="d-inline" onsubmit="return confirm('警告：删除用户是不可逆操作，确定要删除吗？');">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                            <button type="submit" class="btn btn-outline-danger">删除</button>
+                        </form>
+                    </div>
+                    {% endif %}
+                </td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
-    <small class="text-muted">提示：管理员默认拥有所有权限。不能修改自己的权限。</small>
+    <small class="text-muted">提示：管理员默认拥有所有权限。为安全起见，不能修改或删除自己的账户。</small>
 </div>
 {% endblock %}
 
@@ -80,17 +95,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 });
 
                 if (!response.ok) {
-                    // 如果请求失败，则将复选框恢复原状
+                    const errorData = await response.json();
+                    showToast(errorData.error || '更新权限失败。', 'danger');
                     this.checked = !value;
-                    alert('更新权限失败。');
                 } else {
-                    // 成功后刷新页面以正确显示禁用的状态
-                    location.reload();
+                    showToast('权限已更新。页面将刷新...', 'success');
+                    setTimeout(() => location.reload(), 1000);
                 }
 
             } catch (error) {
                 this.checked = !value;
-                alert('发生网络错误。');
+                showToast('发生网络错误。', 'danger');
             }
         });
     });

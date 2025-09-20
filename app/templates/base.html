@@ -49,8 +49,16 @@
                 </ul>
                 <ul class="navbar-nav">
                     {% if current_user.is_authenticated %}
-                        <li class="nav-item"><a class="nav-link">你好, {{ current_user.username }}</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}">退出</a></li>
+                        <li class="nav-item dropdown">
+                          <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            你好, {{ current_user.username }}
+                          </a>
+                          <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{{ url_for('auth.change_password') }}">修改密码</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="{{ url_for('auth.logout') }}">退出</a></li>
+                          </ul>
+                        </li>
                     {% else %}
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}">登录</a></li>
                         <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}">注册</a></li>

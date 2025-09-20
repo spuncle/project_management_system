@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask_login import UserMixin
-from . import db, login_manager
+from . import db, login_manager, bcrypt # 导入 bcrypt
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -19,6 +19,11 @@ class User(db.Model, UserMixin):
     schedules = db.relationship('WorkSchedule', back_populates='author', lazy=True)
     logs = db.relationship('ActivityLog', back_populates='user', lazy=True)
     sent_invitations = db.relationship('InvitationCode', back_populates='creator', lazy=True)
+
+    # --- 【新增】设置密码的辅助方法 ---
+    def set_password(self, password):
+        self.password_hash = bcrypt.generate_password_hash(password).decode('utf-8')
+    # --------------------------------
 
 class InvitationCode(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -39,8 +44,6 @@ class WorkSchedule(db.Model):
     version = db.Column(db.Integer, nullable=False, default=0)
     
     author = db.relationship('User', back_populates='schedules')
-    
-    # --- 【修改】增加了 order_by，让人员始终按顺序排列 ---
     assignments = db.relationship(
         'TaskAssignment', 
         backref='task', 
@@ -48,7 +51,6 @@ class WorkSchedule(db.Model):
         cascade='all, delete-orphan',
         order_by='TaskAssignment.position'
     )
-    # ----------------------------------------------------
 
 class ActivityLog(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -68,7 +70,7 @@ class TaskAssignment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     task_id = db.Column(db.Integer, db.ForeignKey('work_schedule.id'), nullable=False)
     personnel_name = db.Column(db.String(100), nullable=False)
-    position = db.Column(db.Integer, nullable=False) # <--- 【新增】用于排序的字段
+    position = db.Column(db.Integer, nullable=False)
 
     def __repr__(self):
         return f'<TaskAssignment {self.personnel_name}>'

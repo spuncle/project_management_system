@@ -1,6 +1,6 @@
 from flask_wtf import FlaskForm
 from wtforms import StringField, PasswordField, SubmitField, BooleanField
-from wtforms.validators import DataRequired, Length, Email, EqualTo, ValidationError
+from wtforms.validators import DataRequired, Length, EqualTo, ValidationError
 from app.models import User, InvitationCode
 
 class RegistrationForm(FlaskForm):
@@ -29,3 +29,11 @@ class LoginForm(FlaskForm):
 
 class InvitationForm(FlaskForm):
     submit = SubmitField('生成新邀请码')
+
+# --- 【新增】修改密码表单 ---
+class ChangePasswordForm(FlaskForm):
+    current_password = PasswordField('当前密码', validators=[DataRequired()])
+    new_password = PasswordField('新密码', validators=[DataRequired(), Length(min=6)])
+    confirm_new_password = PasswordField('确认新密码', validators=[DataRequired(), EqualTo('new_password', message='两次输入的新密码不一致。')])
+    submit = SubmitField('修改密码')
+# --------------------------

@@ -1,7 +1,7 @@
 import secrets
 from flask import render_template, url_for, flash, redirect, request
 from . import auth_bp
-from .forms import RegistrationForm, LoginForm, InvitationForm
+from .forms import RegistrationForm, LoginForm, InvitationForm, ChangePasswordForm
 from app.models import User, InvitationCode
 from app import db, bcrypt
 from flask_login import login_user, current_user, logout_user, login_required
@@ -15,8 +15,8 @@ def register():
     
     form = RegistrationForm()
     if form.validate_on_submit():
-        hashed_password = bcrypt.generate_password_hash(form.password.data).decode('utf-8')
-        user = User(username=form.username.data, password_hash=hashed_password)
+        user = User(username=form.username.data)
+        user.set_password(form.password.data) # 使用辅助方法
         db.session.add(user)
         
         invitation = InvitationCode.query.filter_by(code=form.invitation_code.data).first()
@@ -70,3 +70,20 @@ def invite():
     
     codes = InvitationCode.query.filter_by(is_used=False).order_by(InvitationCode.created_at.desc()).all()
     return render_template('auth/invite.html', title='生成邀请码', form=form, codes=codes)
+
+# --- 【新增】用户自行修改密码路由 ---
+@auth_bp.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        if bcrypt.check_password_hash(current_user.password_hash, form.current_password.data):
+            current_user.set_password(form.new_password.data)
+            db.session.commit()
+            log_activity('修改密码', '用户自行修改密码成功')
+            flash('您的密码已成功更新。', 'success')
+            return redirect(url_for('main.index'))
+        else:
+            flash('当前密码不正确。', 'danger')
+    return render_template('auth/change_password.html', title='修改密码', form=form)
+# ------------------------------------
