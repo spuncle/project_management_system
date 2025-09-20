@@ -1,4 +1,4 @@
-function showToast(message, type = 'info') {
+function showToast(message, type = 'info', is_html = false) {
     const toastElement = document.getElementById('appToast');
     if (!toastElement) return;
     const toastBody = toastElement.querySelector('.toast-body');
@@ -7,7 +7,11 @@ function showToast(message, type = 'info') {
     toastElement.classList.remove('text-bg-success', 'text-bg-danger', 'text-bg-info', 'text-bg-warning', 'text-bg-secondary', 'bg-light', 'text-dark');
     closeButton.classList.remove('btn-close-white');
     toastElement.classList.add('bg-light', 'text-dark');
-    toastBody.textContent = message;
+    if (is_html) {
+        toastBody.innerHTML = message;
+    } else {
+        toastBody.textContent = message;
+    }
     toast.show();
 }
 
@@ -38,6 +42,29 @@ document.addEventListener('DOMContentLoaded', function () {
     let currentSelectedPersonnel = new Set();
     const allPersonnel = typeof PERSONNEL_WHITELIST !== 'undefined' ? PERSONNEL_WHITELIST : [];
     
+    let tiptapEditor = null;
+    const { Editor } = Tiptap;
+    const { StarterKit } = TiptapStarterKit;
+    const { Color } = TiptapColor;
+    const { TextStyle } = TiptapTextStyle;
+
+    function initTiptapEditor(content = '') {
+        const editorElement = document.querySelector('#tiptap-editor');
+        if (tiptapEditor) {
+            tiptapEditor.destroy();
+        }
+        tiptapEditor = new Editor({
+            element: editorElement,
+            extensions: [ StarterKit, Color, TextStyle ],
+            content: content,
+        });
+
+        const boldBtn = document.querySelector('#editor-bold-btn');
+        const colorBtn = document.querySelector('#editor-color-btn');
+        if (boldBtn) boldBtn.onclick = () => tiptapEditor.chain().focus().toggleBold().run();
+        if (colorBtn) colorBtn.oninput = (event) => tiptapEditor.chain().focus().setColor(event.target.value).run();
+    }
+    
     const popover = new bootstrap.Popover(personnelDisplayArea, {
         html: true,
         content: function () {
@@ -52,7 +79,7 @@ document.addEventListener('DOMContentLoaded', function () {
             searchInput.addEventListener('keydown', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
-                    const newName = e.target.value.trim();
+                    const newName = searchInput.value.trim();
                     if (newName) {
                         currentSelectedPersonnel.add(newName);
                         updatePersonnelDisplay();
@@ -102,10 +129,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const li = document.createElement('li');
             li.className = 'list-group-item border-0 p-1 d-flex align-items-center';
             const uniqueId = `personnel-check-${name.replace(/[^a-zA-Z0-9]/g, '-')}`;
-            li.innerHTML = `
-                <input class="form-check-input me-2" type="checkbox" value="${name}" id="${uniqueId}" ${isChecked ? 'checked' : ''}>
-                <label class="form-check-label" for="${uniqueId}">${name}</label>
-            `;
+            li.innerHTML = `<input class="form-check-input me-2" type="checkbox" value="${name}" id="${uniqueId}" ${isChecked ? 'checked' : ''}><label class="form-check-label" for="${uniqueId}">${name}</label>`;
             listContainer.appendChild(li);
         });
     }
@@ -117,12 +141,7 @@ document.addEventListener('DOMContentLoaded', function () {
             names.forEach(name => {
                 const tag = document.createElement('span');
                 tag.className = 'personnel-tag';
-                tag.title = name;
-                // --- 【修改】为名字文本包裹一个 span ---
-                tag.innerHTML = `
-                    <span class="personnel-tag-name">${name}</span>
-                    <button type="button" class="remove-display-tag-btn" data-name="${name}">&times;</button>
-                `;
+                tag.innerHTML = `<span>${name}</span><button type="button" class="remove-display-tag-btn" data-name="${name}">&times;</button>`;
                 personnelDisplayArea.appendChild(tag);
             });
         } else {
@@ -145,32 +164,27 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     });
 
+    const dragToggle = document.getElementById('dragToggle');
+    let sortableInstances = [];
     if (typeof USER_CAN_EDIT !== 'undefined' && USER_CAN_EDIT) {
         document.querySelectorAll('.task-list-container').forEach(container => {
-            new Sortable(container, {
+            const s = new Sortable(container, {
                 animation: 150,
                 group: 'shared',
                 ghostClass: 'blue-background-class',
                 onEnd: async function (evt) {
                     const movedTaskElement = evt.item;
-                    const fromContainer = evt.from;
-                    const toContainer = evt.to;
                     const payload = {
                         moved_task: {
                             id: parseInt(movedTaskElement.dataset.taskId),
                             version: parseInt(movedTaskElement.dataset.taskVersion)
                         },
                         target_list: {
-                            date: toContainer.dataset.date,
-                            task_ids: Array.from(toContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
-                        }
+                            date: evt.to.dataset.date,
+                            task_ids: Array.from(evt.to.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
+                        },
+                        all_tasks_in_view: Array.from(document.querySelectorAll('.task-card')).map(c => ({ id: parseInt(c.dataset.taskId), version: parseInt(c.dataset.taskVersion) }))
                     };
-                    if (fromContainer !== toContainer) {
-                        payload.source_list = {
-                            date: fromContainer.dataset.date,
-                            task_ids: Array.from(fromContainer.querySelectorAll('.task-card')).map(card => card.dataset.taskId)
-                        };
-                    }
                     try {
                         const response = await fetch('/api/reorder_tasks', {
                             method: 'POST',
@@ -190,7 +204,14 @@ document.addEventListener('DOMContentLoaded', function () {
                     }
                 }
             });
+            sortableInstances.push(s);
         });
+        if(dragToggle) {
+            dragToggle.addEventListener('change', function() {
+                const enabled = this.checked;
+                sortableInstances.forEach(s => s.option('disabled', !enabled));
+            });
+        }
     }
 
     function checkAndToggleEmptyPlaceholder(container) {
@@ -206,11 +227,26 @@ document.addEventListener('DOMContentLoaded', function () {
             placeholder.remove();
         }
     }
+    
+    const weekendToggleBtn = document.getElementById('weekend-toggle-btn');
+    if(weekendToggleBtn){
+        weekendToggleBtn.addEventListener('click', () => {
+            const weekendCols = document.querySelectorAll('.weekend-column');
+            const isHidden = weekendCols[0].style.display === 'none' || weekendCols[0].style.display === '';
+            weekendCols.forEach(col => {
+                col.style.display = isHidden ? 'table-cell' : 'none';
+            });
+            const badge = weekendToggleBtn.querySelector('.badge');
+            weekendToggleBtn.innerHTML = isHidden ? '收起周末' : '展开周末';
+            if (badge) weekendToggleBtn.appendChild(badge);
+        });
+    }
 
     document.body.addEventListener('click', async function(event) {
         const addBtn = event.target.closest('.add-task-btn');
         const editBtn = event.target.closest('.edit-task-btn');
         const deleteBtn = event.target.closest('.delete-task-btn');
+        const restoreLink = event.target.closest('.restore-link');
 
         if (addBtn) {
             taskModalLabel.textContent = '添加新任务';
@@ -219,6 +255,7 @@ document.addEventListener('DOMContentLoaded', function () {
             formTaskId.value = '';
             currentSelectedPersonnel.clear();
             updatePersonnelDisplay();
+            initTiptapEditor('');
             const date = addBtn.dataset.date;
             formStartDate.value = date;
             formEndDate.value = date;
@@ -234,16 +271,17 @@ document.addEventListener('DOMContentLoaded', function () {
             currentSelectedPersonnel.clear();
             const taskId = editBtn.dataset.taskId;
             try {
-                const response = await fetch(`/api/get_task/${taskId}`);
+                const response = await fetch(`/api/get_task_with_range/${taskId}`);
                 if (response.ok) {
                     const task = await response.json();
                     formTaskId.value = task.id;
-                    formContent.value = task.content;
+                    initTiptapEditor(task.content);
                     task.personnel.forEach(p => currentSelectedPersonnel.add(p));
                     updatePersonnelDisplay();
-                    formStartDate.value = task.task_date;
+                    formStartDate.value = task.start_date;
+                    formEndDate.value = task.end_date;
                     formVersion.value = task.version;
-                    formEndDate.parentElement.parentElement.style.display = 'none';
+                    formEndDate.parentElement.parentElement.style.display = 'flex';
                 } else { showToast('无法加载任务详情。', 'danger'); taskModal.hide(); }
             } catch (error) { showToast('网络错误，无法加载任务详情。', 'danger'); }
         }
@@ -252,6 +290,21 @@ document.addEventListener('DOMContentLoaded', function () {
             event.preventDefault();
             const taskId = deleteBtn.dataset.taskId;
             deleteTask(taskId, deleteBtn);
+        }
+
+        if (restoreLink) {
+            event.preventDefault();
+            const taskId = restoreLink.dataset.taskId;
+            try {
+                const response = await fetch(`/api/restore_task/${taskId}`, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken }
+                });
+                if (response.ok) { location.reload(); } 
+                else { showToast('恢复失败。', 'danger'); }
+            } catch (error) {
+                showToast('网络错误，恢复失败。', 'danger');
+            }
         }
     });
 
@@ -263,7 +316,8 @@ document.addEventListener('DOMContentLoaded', function () {
             });
             const data = await response.json();
             if (data.success) {
-                showToast(data.message || '任务已删除。', 'success');
+                const restoreLink = `<a href="#" class="restore-link text-white fw-bold" data-task-id="${data.task_id}">恢复</a>`;
+                showToast(`任务已删除。 ${restoreLink}`, 'success', true);
                 const card = buttonElement.closest('.task-card');
                 const container = card.parentElement;
                 card.remove();
@@ -278,6 +332,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
     taskForm.addEventListener('submit', async function(event) {
         event.preventDefault();
+        document.getElementById('taskFormContent').value = tiptapEditor.getHTML();
         const action = formAction.value;
         let response;
         
@@ -292,7 +347,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (action === 'edit') {
                 const taskId = formTaskId.value;
                 const data = {
-                    content: formContent.value,
+                    content: document.getElementById('taskFormContent').value,
                     personnel: JSON.parse(hiddenPersonnelInput.value),
                     task_date: formStartDate.value,
                     version: parseInt(formVersion.value)
@@ -309,7 +364,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else if (response.status === 409) {
                 const errorData = await response.json();
                 handleConflict(errorData.current_data, {
-                    content: formContent.value,
+                    content: document.getElementById('taskFormContent').value,
                     personnel: JSON.parse(hiddenPersonnelInput.value).map(tag => tag.value),
                 });
             } else {
@@ -327,8 +382,8 @@ document.addEventListener('DOMContentLoaded', function () {
         const currentPersonnelStr = Array.isArray(currentData.personnel) ? currentData.personnel.join(', ') : currentData.personnel;
         const yourPersonnelStr = Array.isArray(yourData.personnel) ? yourData.personnel.join(', ') : yourData.personnel;
 
-        document.getElementById('conflictCurrentContent').textContent = `内容: ${currentData.content}\n人员: ${currentPersonnelStr}`;
-        document.getElementById('conflictYourContent').textContent = `内容: ${yourData.content}\n人员: ${yourPersonnelStr}`;
+        document.getElementById('conflictCurrentContent').innerHTML = currentData.content + '<hr><small>人员: ' + currentPersonnelStr + '</small>';
+        document.getElementById('conflictYourContent').innerHTML = yourData.content + '<hr><small>人员: ' + yourPersonnelStr + '</small>';
         conflictModal.show();
 
         const overwriteBtn = document.getElementById('conflictOverwriteBtn');
@@ -338,12 +393,11 @@ document.addEventListener('DOMContentLoaded', function () {
         newOverwriteBtn.addEventListener('click', async () => {
             const taskId = formTaskId.value;
             const data = {
-                content: formContent.value,
+                content: document.getElementById('taskFormContent').value,
                 personnel: JSON.parse(hiddenPersonnelInput.value),
                 task_date: formStartDate.value,
                 version: currentData.version
             };
-
             const response = await fetch(`/api/update_task/${taskId}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },

@@ -43,6 +43,9 @@ class WorkSchedule(db.Model):
     position = db.Column(db.Integer, nullable=False, default=0)
     version = db.Column(db.Integer, nullable=False, default=0)
     
+    is_deleted = db.Column(db.Boolean, nullable=False, default=False, index=True)
+    deleted_at = db.Column(db.DateTime, nullable=True)
+
     author = db.relationship('User', back_populates='schedules')
     assignments = db.relationship(
         'TaskAssignment', 

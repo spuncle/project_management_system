@@ -11,3 +11,4 @@ python-dotenv==1.0.0
 gunicorn==20.1.0
 bootstrap-flask==2.3.3
 email_validator==2.1.1
+bleach==6.1.0

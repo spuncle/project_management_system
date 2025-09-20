@@ -9,12 +9,32 @@ from datetime import date, timedelta, datetime
 from sqlalchemy import and_, func, case
 import openpyxl
 import json
+import bleach
 
 from . import main_bp
 from app import db
 from app.models import WorkSchedule, ActivityLog, Personnel, TaskAssignment
 from app.utils import log_activity
 from app.decorators import permission_required, admin_required
+
+# --- HTML 清洗配置 ---
+ALLOWED_TAGS = ['p', 'b', 'strong', 'i', 'em', 'span', 'br']
+ALLOWED_ATTRIBUTES = {'span': ['style']}
+ALLOWED_STYLES = ['color']
+
+def sanitize_html(html_content):
+    """使用 Bleach 清洗用户输入的 HTML，防止 XSS 攻击。"""
+    if not html_content:
+        return ""
+    return bleach.clean(
+        html_content,
+        tags=ALLOWED_TAGS,
+        attributes=ALLOWED_ATTRIBUTES,
+        styles=ALLOWED_STYLES,
+        strip=True
+    ).strip()
+# --------------------
+
 
 def get_week_dates(start_date_str=None):
     if start_date_str:
@@ -41,6 +61,7 @@ def index():
     is_current_week = (start_of_week == current_week_start)
 
     tasks = WorkSchedule.query.filter(
+        WorkSchedule.is_deleted == False, # 过滤掉已删除的任务
         WorkSchedule.task_date.between(start_of_week, end_of_week)
     ).order_by(WorkSchedule.task_date, WorkSchedule.position).all()
     
@@ -50,6 +71,11 @@ def index():
     for task in tasks:
         if task.task_date in schedule_by_day:
             schedule_by_day[task.task_date].append(task)
+        
+    # 判断周末是否有任务，用于前端提示
+    saturday_date = week_dates[5]
+    sunday_date = week_dates[6]
+    weekend_has_tasks = len(schedule_by_day[saturday_date]) > 0 or len(schedule_by_day[sunday_date]) > 0
         
     prev_week_start = start_of_week - timedelta(days=7)
     next_week_start = start_of_week + timedelta(days=7)
@@ -66,7 +92,8 @@ def index():
         next_week=next_week_start.strftime('%Y-%m-%d'),
         is_current_week=is_current_week,
         page_main_title=page_main_title,
-        page_date_range=page_date_range
+        page_date_range=page_date_range,
+        weekend_has_tasks=weekend_has_tasks
     )
 
 @main_bp.route('/add_task', methods=['POST'])
@@ -77,6 +104,8 @@ def add_task():
     end_date_str = request.form.get('end_date') or start_date_str
     content = request.form.get('content')
     personnel_json_str = request.form.get('personnel', '[]')
+    
+    sanitized_content = sanitize_html(content)
 
     try:
         personnel_list = json.loads(personnel_json_str)
@@ -84,7 +113,7 @@ def add_task():
     except (json.JSONDecodeError, TypeError):
         personnel_names = []
 
-    if not all([start_date_str, content, personnel_names]):
+    if not all([start_date_str, sanitized_content, personnel_names]):
         flash('开始日期、工作内容和人员均为必填项。', 'danger')
         return redirect(url_for('main.index'))
 
@@ -97,10 +126,10 @@ def add_task():
 
     current_date = start_date
     while current_date <= end_date:
-        max_pos = db.session.query(func.max(WorkSchedule.position)).filter_by(task_date=current_date).scalar() or -1
+        max_pos = db.session.query(func.max(WorkSchedule.position)).filter_by(task_date=current_date, is_deleted=False).scalar() or -1
         new_task = WorkSchedule(
             task_date=current_date,
-            content=content,
+            content=sanitized_content,
             author_id=current_user.id,
             position=max_pos + 1
         )
@@ -111,22 +140,44 @@ def add_task():
         current_date += timedelta(days=1)
     
     db.session.commit()
-    log_activity('创建任务', f"为日期 {start_date_str} 到 {end_date_str} 添加了任务: '{content}'")
+    log_activity('创建任务', f"为日期 {start_date_str} 到 {end_date_str} 添加了任务: '{sanitized_content}'")
     flash('新任务已添加。', 'success')
         
     return redirect(url_for('main.index', start_date=start_date_str))
 
-@main_bp.route('/api/get_task/<int:task_id>')
+@main_bp.route('/api/get_task_with_range/<int:task_id>')
 @login_required
-def get_task_details(task_id):
-    task = WorkSchedule.query.get_or_404(task_id)
-    personnel_list = [a.personnel_name for a in task.assignments]
+def get_task_with_range(task_id):
+    task = WorkSchedule.query.filter_by(id=task_id, is_deleted=False).first_or_404()
+    personnel_set = set(a.personnel_name for a in task.assignments)
+    
+    start_date = task.task_date
+    current_date = task.task_date - timedelta(days=1)
+    while True:
+        prev_task = WorkSchedule.query.filter_by(task_date=current_date, content=task.content, is_deleted=False).first()
+        if prev_task and set(a.personnel_name for a in prev_task.assignments) == personnel_set:
+            start_date = current_date
+            current_date -= timedelta(days=1)
+        else:
+            break
+            
+    end_date = task.task_date
+    current_date = task.task_date + timedelta(days=1)
+    while True:
+        next_task = WorkSchedule.query.filter_by(task_date=current_date, content=task.content, is_deleted=False).first()
+        if next_task and set(a.personnel_name for a in next_task.assignments) == personnel_set:
+            end_date = current_date
+            current_date += timedelta(days=1)
+        else:
+            break
+            
     return jsonify({
         'id': task.id,
-        'task_date': task.task_date.strftime('%Y-%m-%d'),
         'content': task.content,
-        'personnel': personnel_list,
-        'version': task.version
+        'personnel': [a.personnel_name for a in task.assignments],
+        'version': task.version,
+        'start_date': start_date.strftime('%Y-%m-%d'),
+        'end_date': end_date.strftime('%Y-%m-%d')
     })
 
 @main_bp.route('/api/update_task/<int:task_id>', methods=['POST'])
@@ -151,7 +202,8 @@ def update_task(task_id):
             }
         }), 409
 
-    task.content = data.get('content', task.content)
+    raw_content = data.get('content', task.content)
+    task.content = sanitize_html(raw_content)
     
     personnel_data = data.get('personnel', None)
     if personnel_data is not None and isinstance(personnel_data, list):
@@ -178,7 +230,6 @@ def update_task(task_id):
 def reorder_tasks():
     data = request.get_json()
     moved_task_data = data.get('moved_task')
-    source_list_data = data.get('source_list')
     target_list_data = data.get('target_list')
 
     if not moved_task_data or not target_list_data:
@@ -189,11 +240,7 @@ def reorder_tasks():
 
     moved_task_db = WorkSchedule.query.get(moved_task_id)
     if not moved_task_db or moved_task_db.version != client_version:
-        return jsonify({
-            'success': False,
-            'error': '操作失败，任务已被他人修改。请刷新页面后重试。',
-            'conflict': True
-        }), 409
+        return jsonify({'success': False, 'error': '操作失败，任务已被他人修改。请刷新页面后重试。', 'conflict': True}), 409
 
     try:
         new_date_str = target_list_data.get('date')
@@ -201,22 +248,17 @@ def reorder_tasks():
         if moved_task_db.task_date != new_date:
             moved_task_db.task_date = new_date
 
+        all_task_ids = [t['id'] for t in data.get('all_tasks_in_view', [])]
+        db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(all_task_ids)).update(
+            {'version': WorkSchedule.version + 1}, synchronize_session=False
+        )
+
         target_ids = target_list_data.get('task_ids', [])
         if target_ids:
             target_case = case({int(tid): i for i, tid in enumerate(target_ids)}, value=WorkSchedule.id)
             db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(target_ids)).update(
-                {'position': target_case, 'version': WorkSchedule.version + 1},
-                synchronize_session=False
+                {'position': target_case}, synchronize_session=False
             )
-        
-        if source_list_data:
-            source_ids = source_list_data.get('task_ids', [])
-            if source_ids:
-                source_case = case({int(tid): i for i, tid in enumerate(source_ids)}, value=WorkSchedule.id)
-                db.session.query(WorkSchedule).filter(WorkSchedule.id.in_(source_ids)).update(
-                    {'position': source_case, 'version': WorkSchedule.version + 1},
-                    synchronize_session=False
-                )
         
         db.session.commit()
         log_activity('拖拽任务', f"移动了任务ID {moved_task_id}")
@@ -232,10 +274,24 @@ def reorder_tasks():
 @permission_required('can_delete')
 def api_delete_task(task_id):
     task = WorkSchedule.query.get_or_404(task_id)
-    log_activity('删除任务', f"删除任务ID {task_id}, 内容: '{task.content}'")
-    db.session.delete(task)
+    task.is_deleted = True
+    task.deleted_at = datetime.utcnow()
     db.session.commit()
-    return jsonify({'success': True, 'message': '任务已删除。'})
+    log_activity('软删除任务', f"软删除了任务ID {task_id}, 内容: '{task.content}'")
+    return jsonify({'success': True, 'message': '任务已删除。', 'task_id': task.id})
+
+@main_bp.route('/api/restore_task/<int:task_id>', methods=['POST'])
+@login_required
+@permission_required('can_add')
+def restore_task(task_id):
+    task = WorkSchedule.query.get_or_404(task_id)
+    if task.is_deleted:
+        task.is_deleted = False
+        task.deleted_at = None
+        db.session.commit()
+        log_activity('恢复任务', f"恢复了任务ID {task_id}, 内容: '{task.content}'")
+        return jsonify({'success': True, 'message': '任务已恢复。'})
+    return jsonify({'success': False, 'error': '任务未被删除。'}), 400
 
 @main_bp.route('/export_excel', methods=['POST'])
 @login_required
@@ -246,6 +302,7 @@ def export_excel():
     end_of_week = week_dates[-1]
 
     tasks = WorkSchedule.query.filter(
+        WorkSchedule.is_deleted == False,
         WorkSchedule.task_date.between(start_of_week, end_of_week)
     ).order_by(WorkSchedule.task_date, WorkSchedule.position).all()
     
@@ -260,9 +317,10 @@ def export_excel():
             schedule_by_day[task.task_date].append(task.content)
             schedule_by_day[task.task_date].append(personnel_str)
 
-    max_rows = 0
-    if schedule_by_day:
-        max_rows = max(len(day_tasks) for day_tasks in schedule_by_day.values()) if any(schedule_by_day.values()) else 0
+    max_rows = max(len(day_tasks) for day_tasks in schedule_by_day.values()) if any(schedule_by_day.values()) else 0
+    if max_rows == 0:
+        flash('该周没有可导出的数据。', 'warning')
+        return redirect(url_for('main.index', start_date=start_date_str))
 
     data_dict = {}
     for day in week_dates:
@@ -277,40 +335,32 @@ def export_excel():
         df.to_excel(writer, index=False, sheet_name='周工作计划')
         worksheet = writer.sheets['周工作计划']
         
-        # --- 【修改】定义样式 ---
         header_font = Font(bold=True)
         content_font = Font(bold=True)
-        
-        # 定义黑色细边框
         thin_side = Side(style='thin', color="000000")
         full_border = Border(left=thin_side, right=thin_side, top=thin_side, bottom=thin_side)
         alignment = Alignment(wrap_text=True, vertical='top')
-        
-        # 浅灰色背景填充
         band_fill = PatternFill(start_color="F5F5F5", end_color="F5F5F5", fill_type="solid")
 
         for col_idx, col in enumerate(df.columns, 1):
             column_letter = get_column_letter(col_idx)
             worksheet.column_dimensions[column_letter].width = 40
             
-            # 为表头单元格应用样式
             header_cell = worksheet[f"{column_letter}1"]
             header_cell.font = header_font
             header_cell.border = full_border
             
-            # 遍历所有数据单元格设置样式
             for row_idx in range(2, max_rows + 2):
                 cell = worksheet[f"{column_letter}{row_idx}"]
                 cell.alignment = alignment
-                cell.border = full_border # 为所有数据单元格应用表格线
+                cell.border = full_border
                 
                 task_pair_index = (row_idx - 2) // 2
-                if (row_idx - 2) % 2 == 0: # 内容行
+                if (row_idx - 2) % 2 == 0:
                     cell.font = content_font
-                    if task_pair_index % 2 == 1: # 为第二个、第四个...任务组应用背景色
+                    if task_pair_index % 2 == 1:
                         cell.fill = band_fill
-                else: # 人员行
-                    # 人员行使用默认字体
+                else:
                     if task_pair_index % 2 == 1:
                         cell.fill = band_fill
     

@@ -8,6 +8,13 @@
     <link href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}" rel="stylesheet">
     <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .tiptap { min-height: 120px; border: 1px solid #dee2e6; border-radius: .25rem; padding: .375rem .75rem;}
+        .tiptap:focus { border-color: #86b7fe; outline: 0; box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, .25);}
+        .tiptap p { margin-bottom: 0; }
+        .editor-toolbar button { margin-right: 5px; }
+        .weekend-column { display: none; }
+    </style>
 </head>
 <body>
     <div class="toast-container position-fixed bottom-0 start-0 p-3" style="z-index: 1100">
@@ -85,8 +92,13 @@
                         <input type="hidden" name="form_action" id="taskFormAction">
                         <input type="hidden" id="taskFormVersion">
                         <div class="mb-3">
-                            <label for="taskFormContent" class="form-label">工作内容</label>
-                            <textarea name="content" id="taskFormContent" class="form-control" rows="3" required></textarea>
+                            <label class="form-label">工作内容</label>
+                            <div id="editor-toolbar">
+                                <button type="button" id="editor-bold-btn" class="btn btn-sm btn-outline-secondary"><b>B</b></button>
+                                <input type="color" id="editor-color-btn" class="form-control-color" style="vertical-align: middle;">
+                            </div>
+                            <div id="tiptap-editor"></div>
+                            <textarea name="content" id="taskFormContent" class="d-none" required></textarea>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">人员</label>
@@ -155,6 +167,10 @@
 
     <script src="{{ url_for('static', filename='vendor/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ url_for('static', filename='vendor/Sortable.min.js') }}"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/core@2.0.3/dist/tiptap-core.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/starter-kit@2.0.3/dist/tiptap-starter-kit.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-color@2.0.3/dist/tiptap-extension-color.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tiptap/extension-text-style@2.0.3/dist/tiptap-extension-text-style.umd.min.js"></script>
     <script src="{{ url_for('static', filename='js/schedule.js') }}"></script>
     
     <script>
