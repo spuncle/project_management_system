@@ -117,7 +117,12 @@ document.addEventListener('DOMContentLoaded', function () {
             names.forEach(name => {
                 const tag = document.createElement('span');
                 tag.className = 'personnel-tag';
-                tag.innerHTML = `<span>${name}</span><button type="button" class="remove-display-tag-btn" data-name="${name}">&times;</button>`;
+                tag.title = name;
+                // --- 【修改】为名字文本包裹一个 span ---
+                tag.innerHTML = `
+                    <span class="personnel-tag-name">${name}</span>
+                    <button type="button" class="remove-display-tag-btn" data-name="${name}">&times;</button>
+                `;
                 personnelDisplayArea.appendChild(tag);
             });
         } else {
@@ -132,7 +137,6 @@ document.addEventListener('DOMContentLoaded', function () {
             const name = event.target.dataset.name;
             currentSelectedPersonnel.delete(name);
             updatePersonnelDisplay();
-            // If popover is open, update its state too
             const popoverTip = popover.tip;
             if (popoverTip && popoverTip.classList.contains('show')) {
                 const listContainer = popoverTip.querySelector('.personnel-list-container');

@@ -12,6 +12,11 @@ body {
     word-wrap: break-word;
 }
 
+.table-bordered th,
+.table-bordered td {
+    border: 1px solid #dee2e6;
+}
+
 .task-card {
     border: 1px solid #dee2e6;
     border-radius: .3rem;
@@ -95,6 +100,10 @@ body {
     margin-right: 5px;
     margin-bottom: 5px;
     max-width: 150px;
+}
+
+.personnel-tag-name {
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
 }
@@ -110,12 +119,12 @@ body {
     font-weight: 700;
     line-height: 1;
     opacity: 0.5;
+    flex-shrink: 0;
 }
 .remove-display-tag-btn:hover {
     opacity: 1;
     color: #000;
 }
-
 
 .blue-background-class {
     background-color: #e0e7ff;
@@ -159,3 +168,55 @@ body {
     padding-left: 0.5rem;
     padding-right: 0.5rem;
 }
+
+.selected-personnel-popover {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.selected-tag-item {
+    display: inline-flex;
+    align-items: center;
+    background-color: #0d6efd;
+    color: white;
+    padding: 3px 8px;
+    border-radius: 5px;
+    font-size: 0.85em;
+}
+
+.remove-tag-btn {
+    background: none;
+    border: none;
+    color: white;
+    margin-left: 6px;
+    padding: 0;
+    opacity: 0.7;
+    cursor: pointer;
+    font-size: 1.2em;
+    line-height: 1;
+}
+.remove-tag-btn:hover {
+    opacity: 1;
+}
+
+/* --- 移动端响应式样式 --- */
+@media (max-width: 767px) {
+    /* 为表格设置最小宽度以触发横向滚动 */
+    .table-responsive .table {
+        min-width: 1200px;
+    }
+
+    /* 缩小手机上的字体 */
+    .task-content {
+        font-size: 0.9rem;
+    }
+    
+    .personnel-tag {
+        font-size: 70%;
+        max-width: 120px;
+    }
+}
+/* ----------------------------- */

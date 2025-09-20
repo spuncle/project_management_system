@@ -4,3 +4,7 @@ import os
 SECRET_KEY = os.environ.get('SECRET_KEY', 'default_secret_key_for_development_hld')
 SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL', 'sqlite:///../instance/project.db')
 SQLALCHEMY_TRACK_MODIFICATIONS = False
+
+WTF_CSRF_HOST_STRICT = False
+
+SERVER_NAME = '113.44.172.104:15688'
