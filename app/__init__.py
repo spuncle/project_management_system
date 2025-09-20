@@ -41,15 +41,6 @@ def create_app():
         app.register_blueprint(main_routes.main_bp)
         app.register_blueprint(admin_routes.admin_bp)
 
-        db.create_all()
-
-        from .models import User
-        if User.query.count() == 1:
-            first_user = User.query.first()
-            if not first_user.is_admin:
-                first_user.is_admin = True
-                db.session.commit()
-
         # vvv --- 更新 403 错误处理器 --- vvv
         @app.errorhandler(403)
         def forbidden_error(error):
